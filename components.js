@@ -2105,15 +2105,17 @@ const Components = {
                     <div id="supplies-tabs-content">
                         <!-- TAB 1: CONSUMABLES AND SUBSTRATES -->
                         <div id="stock-tab-section">
+                            ${GoogleAPI.user.role !== 'Observador' ? `
+                                <div class="d-flex justify-content-end mb-3">
+                                    <button id="btn-quick-adjust-supply" class="btn btn-primary">
+                                        <i class="fa-solid fa-dolly"></i> Movimiento de Stock
+                                    </button>
+                                </div>
+                            ` : ''}
                             <!-- Sustratos (Alimentación) -->
                             <div class="card mb-4">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <h3><i class="fa-solid fa-wheat-awn text-success"></i> 1. Sustratos (Alimentación y Cría)</h3>
-                                    ${GoogleAPI.user.role !== 'Observador' ? `
-                                        <button id="btn-quick-adjust-supply" class="btn btn-primary btn-sm">
-                                            <i class="fa-solid fa-dolly"></i> Movimiento de Stock
-                                        </button>
-                                    ` : ''}
                                 </div>
                                 <div class="table-responsive">
                                     <table class="table">
