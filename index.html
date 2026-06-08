@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BSF BioManager - Control de Cría</title>
+    <meta name="description" content="Sistema de gestión y contabilidad para criaderos de Mosca Soldado Negra (BSF). Control de reportes, gastos, ingresos e insumos.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner-container">
+            <div class="bio-spinner"></div>
+            <p class="loading-text">Cargando BSF BioManager...</p>
+        </div>
+    </div>
+
+    <!-- Login Page -->
+    <div id="login-container" class="login-container hidden">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo-icon-large">
+                    <i class="fa-solid fa-bug"></i>
+                </div>
+                <h1>BSF BioManager</h1>
+                <p>Gestión Inteligente de Cría de Mosca Soldado Negra</p>
+            </div>
+            <div class="login-body">
+                <p class="login-description">Inicia sesión con tu cuenta de Google autorizada para acceder al sistema y sincronizar tus datos con Google Drive y Google Sheets.</p>
+                <button id="btn-login" class="btn btn-primary btn-block btn-lg">
+                    <i class="fa-brands fa-google btn-icon"></i> Iniciar Sesión con Google
+                </button>
+            </div>
+            <div class="login-footer">
+                <p>Infraestructura de datos privada e integrada en tu propio Drive.</p>
+                <p class="opex-badge">OPEX $0 garantizado</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application Container -->
+    <div id="app-container" class="app-container hidden">
+        <!-- Sidebar Navigation (Desktop) -->
+        <aside id="sidebar-nav" class="sidebar">
+            <div class="sidebar-header">
+                <span class="logo-icon"><i class="fa-solid fa-bug"></i></span>
+                <span class="logo-text">BSF BioManager</span>
+            </div>
+            <nav class="sidebar-menu">
+                <a href="#dashboard" id="nav-desktop-dashboard" class="nav-item active" data-page="dashboard">
+                    <i class="fa-solid fa-chart-pie"></i> Panel General
+                </a>
+                <a href="#feeding" id="nav-desktop-feeding" class="nav-item" data-page="feeding">
+                    <i class="fa-solid fa-shuttle-space"></i> Control de Tinas
+                </a>
+                <a href="#add-report" id="nav-desktop-add-report" class="nav-item" data-page="add-report">
+                    <i class="fa-solid fa-circle-plus"></i> Nuevo Reporte
+                </a>
+                <a href="#reports-list" id="nav-desktop-reports-list" class="nav-item" data-page="reports-list">
+                    <i class="fa-solid fa-images"></i> Historial Diario
+                </a>
+                <a href="#finances" id="nav-desktop-finances" class="nav-item" data-page="finances">
+                    <i class="fa-solid fa-scale-balanced"></i> Contabilidad
+                </a>
+                <a href="#supplies" id="nav-desktop-supplies" class="nav-item" data-page="supplies">
+                    <i class="fa-solid fa-boxes-stacked"></i> Insumos / Stock
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-profile-mini">
+                    <img id="user-avatar" class="user-avatar" src="" alt="Avatar">
+                    <div class="user-details">
+                        <span id="user-name" class="user-name">Usuario</span>
+                        <span id="user-role" class="user-role-badge">Rol</span>
+                    </div>
+                </div>
+                <button id="btn-logout-desktop" class="btn btn-outline btn-block btn-sm mt-3" title="Cerrar sesión">
+                    <i class="fa-solid fa-right-from-bracket"></i> Salir
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <!-- Header bar -->
+            <header class="top-header">
+                <div class="header-left">
+                    <!-- Hamburger menu for tablet/mobile sidebar if needed -->
+                    <button id="btn-mobile-menu" class="btn-icon-only mobile-only-inline" aria-label="Menú">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <h2 id="current-page-title" class="page-title">Panel General</h2>
+                </div>
+                <div class="header-right">
+                    <div id="sync-status" class="sync-status online" title="Sincronizado con Google Sheets">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Conectado
+                    </div>
+                    <div class="theme-toggle" id="btn-theme-toggle" title="Cambiar tema">
+                        <i class="fa-solid fa-moon"></i>
+                    </div>
+                    <!-- Mobile profile icon -->
+                    <div class="mobile-profile mobile-only">
+                        <img id="user-avatar-mobile" class="user-avatar" src="" alt="Avatar">
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dynamic Content Area -->
+            <section id="content-area" class="content-area">
+                <!-- Inner pages will be injected here by app.js -->
+            </section>
+        </main>
+
+        <!-- Bottom Navigation Bar (Mobile) -->
+        <nav id="bottom-nav" class="bottom-nav mobile-only">
+            <a href="#dashboard" id="nav-mobile-dashboard" class="bottom-nav-item active" data-page="dashboard">
+                <i class="fa-solid fa-chart-pie"></i>
+                <span>Panel</span>
+            </a>
+            <a href="#feeding" id="nav-mobile-feeding" class="bottom-nav-item" data-page="feeding">
+                <i class="fa-solid fa-shuttle-space"></i>
+                <span>Tinas</span>
+            </a>
+            <a href="#add-report" id="nav-mobile-add-report" class="bottom-nav-item" data-page="add-report">
+                <i class="fa-solid fa-circle-plus"></i>
+                <span>Reportar</span>
+            </a>
+            <a href="#reports-list" id="nav-mobile-reports-list" class="bottom-nav-item" data-page="reports-list">
+                <i class="fa-solid fa-images"></i>
+                <span>Historial</span>
+            </a>
+            <a href="#finances" id="nav-mobile-finances" class="bottom-nav-item" data-page="finances">
+                <i class="fa-solid fa-scale-balanced"></i>
+                <span>Finanzas</span>
+            </a>
+            <a href="#supplies" id="nav-mobile-supplies" class="bottom-nav-item" data-page="supplies">
+                <i class="fa-solid fa-boxes-stacked"></i>
+                <span>Stock</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- Error Modal -->
+    <div id="error-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header error">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <h3>Error del Sistema</h3>
+            </div>
+            <div class="modal-body">
+                <p id="error-modal-message">Ha ocurrido un error inesperado al conectar con las APIs de Google.</p>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-error-close" class="btn btn-secondary">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Google Identity Services client SDK (OAuth 2) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Google API Client Library (gapi) -->
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+
+    <!-- App Logic Scripts -->
+    <script src="google-api.js?v=1.3"></script>
+    <script src="components.js?v=1.3"></script>
+    <script src="app.js?v=1.3"></script>
+</body>
+</html>
