@@ -17,6 +17,96 @@ const Components = {
     selectedFiles: [],
 
     /**
+     * Renders quick quantity increment/decrement buttons
+     */
+    renderQuickQtyButtons(inputId, isCurrency = false, defaultUnit = '') {
+        const formatLabel = (delta) => {
+            if (isCurrency) {
+                return delta > 0 ? `+$${delta}` : `-$${Math.abs(delta)}`;
+            }
+            if (defaultUnit) {
+                const suffix = (defaultUnit === 'baldes' && Math.abs(delta) === 1) ? 'balde' : 
+                               (defaultUnit === 'sacos' && Math.abs(delta) === 1) ? 'saco' : defaultUnit;
+                return delta > 0 ? `+${delta} ${suffix}` : `${delta} ${suffix}`;
+            }
+            return delta > 0 ? `+${delta}` : `${delta}`;
+        };
+        return `
+            <div class="d-flex gap-1 mt-1 flex-wrap">
+                <button type="button" class="btn btn-xs btn-outline quick-qty-btn" data-input="${inputId}" data-delta="1" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.75rem;">${formatLabel(1)}</button>
+                <button type="button" class="btn btn-xs btn-outline quick-qty-btn" data-input="${inputId}" data-delta="5" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.75rem;">${formatLabel(5)}</button>
+                <button type="button" class="btn btn-xs btn-outline quick-qty-btn" data-input="${inputId}" data-delta="10" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.75rem;">${formatLabel(10)}</button>
+                <button type="button" class="btn btn-xs btn-outline quick-qty-btn" data-input="${inputId}" data-delta="50" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.75rem;">${formatLabel(50)}</button>
+                <button type="button" class="btn btn-xs btn-outline quick-qty-btn" data-input="${inputId}" data-delta="-1" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.75rem;">${formatLabel(-1)}</button>
+                <button type="button" class="btn btn-xs btn-outline quick-qty-btn-reset" data-input="${inputId}" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.75rem; color: var(--danger); border-color: var(--danger);">Borrar</button>
+            </div>
+        `;
+    },
+
+    /**
+     * Renders collaborators cards checklist
+     */
+    renderCollaboratorsList(users, prefix) {
+        const activeUsers = users.slice(1).filter(u => u[1] && u[1] !== GoogleAPI.user.name);
+        if (activeUsers.length === 0) {
+            return `<p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0;">No hay otros operarios registrados.</p>`;
+        }
+        return `
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.5rem; max-height: 120px; overflow-y: auto; padding: 0.25rem;">
+                ${activeUsers.map((u, i) => `
+                    <div class="card p-2 text-center cursor-pointer collab-select-card" data-val="${u[1]}" data-prefix="${prefix}" style="border: 2px solid var(--border-color); background-color: var(--bg-secondary); margin-bottom: 0; user-select: none; transition: all 0.2s;">
+                        <input type="checkbox" class="${prefix}-collab-chk hidden" value="${u[1]}" id="collab-${prefix}-${i}">
+                        <strong style="font-size: 0.85rem; color: var(--text-primary);">${u[1]}</strong>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    },
+
+    /**
+     * Renders tina selection cards grouped by lot
+     */
+    renderTinaSelection(camas, prefix) {
+        if (camas.length === 0) {
+            return `<div class="text-center text-secondary py-3">No hay tinas activas en este momento.</div>`;
+        }
+        const groupsMap = {};
+        camas.forEach(c => {
+            const groupName = c[4] || 'Sin Lote';
+            if (!groupsMap[groupName]) groupsMap[groupName] = [];
+            groupsMap[groupName].push(c);
+        });
+
+        return Object.keys(groupsMap).map(groupName => {
+            const tinasInGroup = groupsMap[groupName];
+            const groupSafeId = groupName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+            return `
+                <div class="mb-3 p-2 border-bottom" style="border-bottom-color: var(--border-color); background: rgba(255,255,255,0.01); border-radius: var(--radius-sm);">
+                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                        <strong style="font-size: 0.85rem; color: var(--brand-primary);"><i class="fa-solid fa-layer-group"></i> ${groupName}</strong>
+                        <button type="button" class="btn btn-xs btn-outline btn-select-group" data-group-id="${groupSafeId}" data-prefix="${prefix}" style="padding: 0.15rem 0.45rem; font-size: 0.7rem; width: auto; font-weight: bold;">
+                            Seleccionar Lote
+                        </button>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.5rem;">
+                        ${tinasInGroup.map(c => {
+                            const id = c[0];
+                            const name = c[1].replace('Cama', 'Tina');
+                            return `
+                                <div class="card p-2 text-center cursor-pointer tina-select-card" data-id="${id}" data-prefix="${prefix}" style="border: 2px solid var(--border-color); background-color: var(--bg-secondary); margin-bottom: 0; user-select: none; transition: all 0.2s;">
+                                    <input type="checkbox" class="${prefix}-tina-chk tina-checkbox-group-${groupSafeId} hidden" value="${id}" id="chk-${prefix}-${id}">
+                                    <strong style="font-size: 0.9rem; display: block; color: var(--text-primary);">${name}</strong>
+                                    <small style="font-size: 0.7rem; color: var(--text-secondary);">ID: ${id}</small>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    },
+
+    /**
      * Renders Setup Config Form if first time using the app
      */
     renderSetup(containerId, onSaveCallback) {
@@ -87,6 +177,8 @@ const Components = {
             const financeRows = await GoogleAPI.getSheetData('Finanzas!A:G');
             const supplyRows = await GoogleAPI.getSheetData('Insumos!A:H');
             const reportRows = await GoogleAPI.getSheetData('Reportes!A:F');
+            const camasRows = await GoogleAPI.getSheetData('Camas!A:E');
+            const feedingRows = await GoogleAPI.getSheetData('Registro_Alimentacion!A:H');
 
             // Skip headers in processing
             const finances = financeRows.slice(1);
@@ -143,6 +235,42 @@ const Components = {
                         title: `Stock Bajo: ${displayName}`,
                         desc: `Quedan ${stock.toFixed(1)} ${unit} disponibles en inventario.`
                     });
+                }
+            });
+
+            // Larva feeding alarms (Semáforo / Alarma de un día sin comer)
+            const activeTinas = camasRows.slice(1).filter(c => c[3] === 'Activo');
+            const feedings = feedingRows.slice(1);
+            const nowTime = new Date();
+
+            activeTinas.forEach(tina => {
+                const tinaId = tina[0];
+                const tinaName = tina[1].replace('Cama', 'Tina');
+                
+                // Get feedings for this tina
+                const tinaFeedings = feedings.filter(f => f[1] === tinaId);
+                
+                if (tinaFeedings.length === 0) {
+                    alerts.unshift({
+                        type: 'danger',
+                        title: `⚠️ Alarma de Alimentación: ${tinaName}`,
+                        desc: `Esta tina está activa pero no registra ninguna alimentación en el sistema.`
+                    });
+                } else {
+                    // Sort descending (most recent first)
+                    tinaFeedings.sort((a, b) => new Date(b[2].replace(' ', 'T')) - new Date(a[2].replace(' ', 'T')));
+                    const lastFeedDate = new Date(tinaFeedings[0][2].replace(' ', 'T'));
+                    
+                    const diffMs = nowTime - lastFeedDate;
+                    const diffHours = diffMs / (1000 * 60 * 60);
+                    
+                    if (diffHours > 24) {
+                        alerts.unshift({
+                            type: 'danger',
+                            title: `⚠️ Alarma de Alimentación: ${tinaName}`,
+                            desc: `Lleva sin recibir alimento desde hace ${Math.floor(diffHours)} horas. ¡Atención crítica!`
+                        });
+                    }
                 }
             });
 
@@ -335,17 +463,111 @@ const Components = {
     },
 
     /**
+     * Render 1.5. Climatology Mock View (Room Climate)
+     */
+    async renderClimatology(containerId, showLoading, hideLoading) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = `
+            <div class="slide-in-view">
+                <!-- Planning Ribbon -->
+                <div class="card p-3 mb-4 text-center" style="border-left: 4px solid var(--brand-primary); background-color: rgba(34, 197, 94, 0.05);">
+                    <h4 style="color: var(--brand-primary);"><i class="fa-solid fa-clock-rotate-left"></i> MÓDULO PLANIFICADO PARA EL FUTURO</h4>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                        Monitoreo de Climatología y Sensores Automáticos en Tiempo Real. Esta vista está diseñada para integrarse con sensores de IoT próximamente.
+                    </p>
+                </div>
+
+                <!-- Climate Dashboard Layout -->
+                <div class="dashboard-grid">
+                    <!-- Room 1 (Neonatos / Larvas Jóvenes) -->
+                    <div class="card p-4 text-center">
+                        <h3 class="mb-3"><i class="fa-solid fa-door-closed text-success"></i> Sala 1: Maternidad y Eclosión</h3>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary);" class="mb-3">Optimizado para Huevos y Neonatos</p>
+                        
+                        <div style="display: flex; justify-content: space-around; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                            <!-- Temperature Meter -->
+                            <div style="flex: 1;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary);">Temperatura</div>
+                                <div style="font-size: 2rem; font-weight: bold; color: var(--text-success); margin: 0.25rem 0;">28.5 °C</div>
+                                <div style="height: 6px; width: 100%; background: var(--bg-primary); border-radius: 3px; overflow: hidden;">
+                                    <div style="height: 100%; width: 75%; background: var(--text-success);"></div>
+                                </div>
+                                <small style="font-size: 0.7rem; color: var(--text-secondary);">Ideal (27-30°C)</small>
+                            </div>
+                            <!-- Humidity Meter -->
+                            <div style="flex: 1;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary);">Humedad</div>
+                                <div style="font-size: 2rem; font-weight: bold; color: var(--text-success); margin: 0.25rem 0;">65 %</div>
+                                <div style="height: 6px; width: 100%; background: var(--bg-primary); border-radius: 3px; overflow: hidden;">
+                                    <div style="height: 100%; width: 65%; background: var(--text-success);"></div>
+                                </div>
+                                <small style="font-size: 0.7rem; color: var(--text-secondary);">Ideal (60-70%)</small>
+                            </div>
+                        </div>
+                        <div class="alert-item success p-2 text-center" style="font-size: 0.8rem; display: block; border-radius: var(--radius-sm);">
+                            <i class="fa-solid fa-circle-check"></i> Ambiente Estable
+                        </div>
+                    </div>
+
+                    <!-- Room 2 (Crecimiento / Engorde) -->
+                    <div class="card p-4 text-center">
+                        <h3 class="mb-3"><i class="fa-solid fa-door-closed text-success"></i> Sala 2: Engorde de Larvas</h3>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary);" class="mb-3">Optimizado para Larvas Medianas y Grandes</p>
+                        
+                        <div style="display: flex; justify-content: space-around; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                            <!-- Temperature Meter -->
+                            <div style="flex: 1;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary);">Temperatura</div>
+                                <div style="font-size: 2rem; font-weight: bold; color: var(--text-warning); margin: 0.25rem 0;">31.2 °C</div>
+                                <div style="height: 6px; width: 100%; background: var(--bg-primary); border-radius: 3px; overflow: hidden;">
+                                    <div style="height: 100%; width: 85%; background: var(--text-warning);"></div>
+                                </div>
+                                <small style="font-size: 0.7rem; color: var(--text-warning);">Caluroso (>30°C)</small>
+                            </div>
+                            <!-- Humidity Meter -->
+                            <div style="flex: 1;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary);">Humedad</div>
+                                <div style="font-size: 2rem; font-weight: bold; color: var(--text-success); margin: 0.25rem 0;">61 %</div>
+                                <div style="height: 6px; width: 100%; background: var(--bg-primary); border-radius: 3px; overflow: hidden;">
+                                    <div style="height: 100%; width: 61%; background: var(--text-success);"></div>
+                                </div>
+                                <small style="font-size: 0.7rem; color: var(--text-secondary);">Ideal (60-70%)</small>
+                            </div>
+                        </div>
+                        <div class="alert-item warning p-2 text-center" style="font-size: 0.8rem; display: block; border-radius: var(--radius-sm);">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Temperatura ligeramente alta
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sensor charts simulated -->
+                <div class="card mt-4 p-4">
+                    <h3 class="mb-3"><i class="fa-solid fa-chart-area text-success"></i> Gráficos Históricos Simulados</h3>
+                    <div style="height: 250px; display: flex; align-items: center; justify-content: center; background: var(--bg-secondary); border-radius: var(--radius-sm); border: 1px dashed var(--border-color);">
+                        <div class="text-center text-secondary">
+                            <i class="fa-solid fa-chart-line" style="font-size: 3rem; margin-bottom: 0.75rem;"></i>
+                            <p>El gráfico histórico de 24 horas aparecerá automáticamente al conectar los sensores.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    /**
      * Render 2. Add Report Form (Independent Registries)
      */
     async renderAddReport(containerId, showLoading, hideLoading) {
         showLoading("Cargando formularios...");
         
         let camas = [];
+        let users = [];
         try {
             const rawCamas = await GoogleAPI.getCamas();
             camas = rawCamas.slice(1).filter(c => c[3] === 'Activo');
+            users = await GoogleAPI.getUsuarios();
         } catch (err) {
-            console.error("Error loading camas list for report", err);
+            console.error("Error loading data for report", err);
         }
         
         hideLoading();
@@ -360,24 +582,51 @@ const Components = {
         const todayStr = localNow.toISOString().substring(0, 10);
 
         container.innerHTML = `
+            <style>
+                .tina-select-card, .collab-select-card {
+                    border: 2px solid var(--border-color) !important;
+                    background-color: var(--bg-secondary) !important;
+                    border-radius: var(--radius-sm) !important;
+                    padding: 0.75rem !important;
+                    transition: all 0.2s ease-in-out !important;
+                    cursor: pointer !important;
+                    user-select: none !important;
+                }
+                .tina-select-card:hover, .collab-select-card:hover {
+                    border-color: var(--brand-primary) !important;
+                    background-color: rgba(255, 255, 255, 0.02) !important;
+                }
+                .tina-select-card.selected, .collab-select-card.selected {
+                    border-color: var(--text-success) !important;
+                    background-color: rgba(34, 197, 94, 0.1) !important;
+                    box-shadow: 0 0 10px rgba(34, 197, 94, 0.2) !important;
+                }
+                .quick-qty-btn, .quick-qty-btn-reset {
+                    transition: all 0.1s ease !important;
+                }
+                .quick-qty-btn:active, .quick-qty-btn-reset:active {
+                    transform: scale(0.95) !important;
+                }
+            </style>
             <div class="form-card slide-in-view">
                 <!-- Navigation Sub-tabs for Independent Registries -->
                 <div class="filter-tabs mb-3" id="report-type-tabs" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    <span class="filter-tab active" data-form="section-bitacora" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-notes-medical"></i> Registrar Bitácora (Fotos)</span>
-                    <span class="filter-tab" data-form="section-finanzas" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-scale-balanced"></i> Registrar Contabilidad</span>
-                    <span class="filter-tab" data-form="section-insumos" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-boxes-stacked"></i> Registrar Insumo / Stock</span>
-                    <span class="filter-tab" data-form="section-maquinaria" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-screwdriver-wrench"></i> Registrar Maquinaria</span>
+                    <span class="filter-tab active" data-form="section-bitacora" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-notes-medical"></i> 1. Fotos y Novedades del Criadero</span>
+                    <span class="filter-tab" data-form="section-finanzas" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-scale-balanced"></i> 2. Apuntar un Gasto (Compras/Pagos)</span>
+                    <span class="filter-tab" data-form="section-insumos" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-boxes-stacked"></i> 3. Mover Bodega (Entradas/Salidas)</span>
+                    <span class="filter-tab" data-form="section-maquinaria" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-screwdriver-wrench"></i> 4. Registrar Herramientas y Máquinas</span>
+                    <span class="filter-tab" data-form="section-ingresos" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-hand-holding-dollar"></i> 5. Apuntar una Venta (Ingresos)</span>
                 </div>
 
                 <!-- FORM SECTION 1: REPORT & PHOTOS -->
                 <div id="form-bitacora-section" class="card">
-                    <h2 class="mb-3"><i class="fa-solid fa-notes-medical text-success"></i> 1. Información General y Evidencia Visual</h2>
-                    <p class="mb-3">Registra el estado general del criadero, humedad, temperatura, oviposición o cosecha, y sube fotos de evidencia.</p>
+                    <h2 class="mb-3"><i class="fa-solid fa-notes-medical text-success"></i> 1. Fotos y Novedades del Criadero</h2>
+                    <p class="mb-3">Registra cómo va el día, la temperatura general o si alimentaste a las larvas hoy.</p>
                     
                     <form id="add-report-form">
                         <div class="form-row-2">
                             <div class="form-group">
-                                <label class="form-label" for="report-category">Categoría de Reporte</label>
+                                <label class="form-label" for="report-category">¿Qué tipo de tarea hiciste?</label>
                                 <select id="report-category" class="form-control" required>
                                     <option value="General">Control Diario General</option>
                                     <option value="Alimentación">Alimentación / Manejo de Sustrato</option>
@@ -387,7 +636,7 @@ const Components = {
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="report-date">Fecha del Reporte</label>
+                                <label class="form-label" for="report-date">Fecha de la Tarea</label>
                                 <input type="date" id="report-date" class="form-control" value="${todayStr}" required>
                             </div>
                         </div>
@@ -397,7 +646,7 @@ const Components = {
                             <h4 class="mb-3 text-success"><i class="fa-solid fa-seedling"></i> Distribución de Alimento (Tinas)</h4>
                             <div class="form-row-3" style="display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 1rem;">
                                 <div class="form-group mb-0" style="margin-bottom: 0;">
-                                    <label class="form-label" for="report-feed-insumo">Insumo / Alimento</label>
+                                    <label class="form-label" for="report-feed-insumo">Insumo / Alimento suministrado</label>
                                     <input type="text" id="report-feed-insumo" class="form-control" list="report-feed-names-list" placeholder="Ej: Salvado de Trigo">
                                     <datalist id="report-feed-names-list">
                                         <option value="Salvado de Trigo">
@@ -409,8 +658,9 @@ const Components = {
                                     </datalist>
                                 </div>
                                 <div class="form-group mb-0" style="margin-bottom: 0;">
-                                    <label class="form-label" for="report-feed-qty">Cantidad Total</label>
+                                    <label class="form-label" for="report-feed-qty">Cantidad Suministrada</label>
                                     <input type="number" id="report-feed-qty" class="form-control" placeholder="0.0" step="0.1" min="0.1">
+                                    ${this.renderQuickQtyButtons('report-feed-qty', false, 'kg')}
                                 </div>
                                 <div class="form-group mb-0" style="margin-bottom: 0;">
                                     <label class="form-label" for="report-feed-unit">Unidad</label>
@@ -423,46 +673,28 @@ const Components = {
                                 </div>
                             </div>
                             <div class="form-group mt-3 mb-0" style="margin-bottom: 0;">
-                                <label class="form-label">Seleccionar Tinas Alimentadas</label>
-                                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0.5rem; max-height: 180px; overflow-y: auto; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background-color: var(--bg-primary);">
-                                    ${camas.length === 0 ? `
-                                        <div style="grid-column: 1/-1;" class="text-center text-secondary py-3">No hay tinas activas en este momento.</div>
-                                    ` : camas.map(c => {
-                                        const id = c[0];
-                                        const name = c[1].replace('Cama', 'Tina');
-                                        const group = c[4] || 'Sin Grupo';
-                                        return `
-                                            <label class="d-flex align-items-center gap-2 p-2 card mb-0 cursor-pointer" style="flex-direction: row; font-size: 0.8rem; background-color: var(--bg-secondary); border-color: var(--border-color); margin-bottom: 0; user-select: none;">
-                                                <input type="checkbox" class="report-feed-tina-chk" value="${id}" style="margin-bottom: 0;">
-                                                <div style="display: flex; flex-direction: column;">
-                                                    <strong>${name}</strong>
-                                                    <span style="font-size: 0.7rem; color: var(--text-secondary);">${group}</span>
-                                                </div>
-                                            </label>
-                                        `;
-                                    }).join('')}
-                                </div>
-                                ${camas.length > 0 ? `
-                                    <div class="mt-2 d-flex gap-2">
-                                        <button type="button" id="btn-report-select-all-tinas" class="btn btn-outline btn-xs"><i class="fa-solid fa-check-double"></i> Seleccionar Todas</button>
-                                        <button type="button" id="btn-report-clear-tinas" class="btn btn-outline btn-xs"><i class="fa-solid fa-square-minus"></i> Limpiar</button>
-                                    </div>
-                                ` : ''}
+                                <label class="form-label">Toca sobre las tinas que quieres alimentar (por lote):</label>
+                                ${this.renderTinaSelection(camas, 'report')}
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label class="form-label" for="report-desc">Descripción detallada</label>
-                            <textarea id="report-desc" class="form-control" placeholder="Escribe el estado de humedad, temperatura, desarrollo de larvas o cualquier observación importante de hoy..." required></textarea>
+                            <label class="form-label" for="report-desc">Novedades u Observaciones del Día</label>
+                            <textarea id="report-desc" class="form-control" placeholder="Escribe aquí de forma simple cómo encontraste el criadero hoy, el desarrollo de las larvas, etc..." required></textarea>
                         </div>
 
                         <div class="form-group">
-                            <label class="form-label">Fotos de Alta Resolución (Sincronizado a Drive)</label>
+                            <label class="form-label">¿Quiénes colaboraron en esta tarea hoy?</label>
+                            ${this.renderCollaboratorsList(users, 'report')}
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Fotos de Evidencia (Se guardarán en Drive)</label>
                             <div class="file-upload-wrapper" id="file-dropzone">
                                 <div class="file-upload-message">
                                     <i class="fa-solid fa-cloud-arrow-up"></i>
-                                    <p>Arrastra imágenes aquí o <strong>haz clic para buscar</strong></p>
-                                    <small class="text-secondary">Soporta JPG, PNG de cámara o galería móvil</small>
+                                    <p>Arrastra fotos aquí o <strong>toca para abrir la cámara/galería</strong></p>
+                                    <small class="text-secondary">Soporta fotos JPG o PNG</small>
                                 </div>
                                 <input type="file" id="report-photos" multiple accept="image/*">
                             </div>
@@ -470,78 +702,81 @@ const Components = {
                         </div>
 
                         <button type="submit" class="btn btn-primary btn-block btn-lg mt-3">
-                            <i class="fa-solid fa-cloud-arrow-up"></i> Registrar Bitácora Diaria
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Registrar Novedades del Día
                         </button>
                     </form>
                 </div>
 
                 <!-- FORM SECTION 2: FINANCES -->
                 <div id="form-finanzas-section" class="card hidden">
-                    <h2 class="mb-3"><i class="fa-solid fa-scale-balanced text-success"></i> 2. Transacción Contable del Criadero</h2>
-                    <p class="mb-3">Registra compras de sustratos, herramientas, cobros por ventas de larvas vivas, abono (frass), servicios públicos o cualquier otro movimiento financiero.</p>
+                    <h2 class="mb-3"><i class="fa-solid fa-scale-balanced text-success"></i> 2. Apuntar un Gasto (Compras / Pagos)</h2>
+                    <p class="mb-3">Registra compras de alimentos, transporte del sustrato, pagos de servicios de agua o luz, o el sueldo de los trabajadores.</p>
                     
                     <form id="add-finance-form">
                         <div class="form-row-2">
                             <div class="form-group">
-                                <label class="form-label" for="finance-type">Tipo de Operación</label>
-                                <select id="finance-type" class="form-control" required>
-                                    <option value="Gasto">Gasto / Egreso (Alimento, luz, sueldos, etc)</option>
-                                    <option value="Ingreso">Ingreso / Venta (Venta larva, abono frass, etc)</option>
+                                <label class="form-label" for="finance-type">Tipo de Movimiento</label>
+                                <select id="finance-type" class="form-control" required disabled>
+                                    <option value="Gasto" selected>Gasto / Egreso (Pago realizado)</option>
+                                    <option value="Ingreso">Ingreso / Venta (Entrada de dinero)</option>
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="finance-amount">Monto ($)</label>
+                                <label class="form-label" for="finance-amount">Monto Pagado ($)</label>
                                 <input type="number" id="finance-amount" class="form-control" placeholder="0.00" step="0.01" min="0.01" required>
+                                ${this.renderQuickQtyButtons('finance-amount', true)}
                             </div>
                         </div>
                         <div class="form-row-2">
                             <div class="form-group">
-                                <label class="form-label" for="finance-category">Categoría Financiera</label>
-                                <input type="text" id="finance-category" class="form-control" list="finance-cat-list" placeholder="Selecciona o escribe una..." required>
+                                <label class="form-label" for="finance-category">¿Qué tipo de gasto fue?</label>
+                                <input type="text" id="finance-category" class="form-control" list="finance-cat-list" placeholder="Elige de la lista o escribe..." required>
                                 <datalist id="finance-cat-list">
                                     <option value="Servicios: Luz / Agua">
                                     <option value="Logística: Transporte de Sustrato">
                                     <option value="Personal: Pago a Trabajadores">
                                     <option value="Operativo: Compra de Insumos">
                                     <option value="Activos: Compra de Maquinaria">
-                                    <option value="Venta Larva Viva">
-                                    <option value="Venta Harina BSF">
-                                    <option value="Venta Frass (Abono)">
                                     <option value="Otros Gastos">
                                 </datalist>
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="finance-date">Fecha de la Transacción</label>
+                                <label class="form-label" for="finance-date">Fecha del Pago</label>
                                 <input type="date" id="finance-date" class="form-control" value="${todayStr}" required>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label" for="finance-desc">Detalle del Movimiento</label>
-                            <input type="text" id="finance-desc" class="form-control" placeholder="Ej: Pago de recibo de luz de Mayo" required>
+                            <label class="form-label" for="finance-desc">¿En qué se usó el dinero? (Detalle legible)</label>
+                            <input type="text" id="finance-desc" class="form-control" placeholder="Ej: Pago de recibo de luz de Mayo, o Compra de 50 sacos de afrecho" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">¿Quiénes colaboraron en esta tarea hoy?</label>
+                            ${this.renderCollaboratorsList(users, 'finance')}
                         </div>
 
                         <button type="submit" class="btn btn-primary btn-block btn-lg mt-3">
-                            <i class="fa-solid fa-floppy-disk"></i> Registrar Transacción Contable
+                            <i class="fa-solid fa-floppy-disk"></i> Registrar Gasto de Dinero
                         </button>
                     </form>
                 </div>
 
                 <!-- FORM SECTION 3: SUPPLIES -->
                 <div id="form-insumos-section" class="card hidden">
-                    <h2 class="mb-3"><i class="fa-solid fa-boxes-stacked text-success"></i> 3. Registro de Inventario de Insumos</h2>
-                    <p class="mb-3">Añade stock recién comprado o registra consumos de insumos de tu bodega de cría (sustratos, cajas, etc).</p>
+                    <h2 class="mb-3"><i class="fa-solid fa-boxes-stacked text-success"></i> 3. Mover Bodega (Entradas / Salidas de Alimentos)</h2>
+                    <p class="mb-3">Añade stock recién comprado o registra el alimento que le das a las tinas de bodega.</p>
                     
                     <form id="add-supply-form">
                         <div class="form-row-3" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
                             <div class="form-group">
-                                <label class="form-label" for="supply-category">Categoría</label>
+                                <label class="form-label" for="supply-category">Tipo de Insumo</label>
                                 <select id="supply-category" class="form-control" required>
-                                    <option value="Sustrato">Sustrato (Alimentación)</option>
-                                    <option value="Insumo General">Insumo General (Limpieza, cajas, etc)</option>
+                                    <option value="Sustrato">Sustrato (Alimento de larvas)</option>
+                                    <option value="Insumo General">Insumo General (Limpieza, bandejas, etc)</option>
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="supply-name">Nombre del Insumo</label>
+                                <label class="form-label" for="supply-name">Nombre del Producto / Insumo</label>
                                 <input type="text" id="supply-name" class="form-control" list="supply-names-list" placeholder="Ej: Aserrín" required>
                                 <datalist id="supply-names-list">
                                     <option value="Aserrín">
@@ -553,17 +788,18 @@ const Components = {
                                 </datalist>
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="supply-action">Acción Realizada</label>
+                                <label class="form-label" for="supply-action">¿Qué movimiento harás?</label>
                                 <select id="supply-action" class="form-control" required>
-                                    <option value="Utilización">Utilización (Suministrar a tinas)</option>
-                                    <option value="Adición">Adición (Compra / Entrada a stock)</option>
+                                    <option value="Utilización">Salida de Bodega (Alimentar tinas)</option>
+                                    <option value="Adición">Entrada a Bodega (Compra / Ingreso)</option>
                                 </select>
                             </div>
                         </div>
                         <div class="form-row-3" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
                             <div class="form-group">
-                                <label class="form-label" for="supply-qty">Cantidad</label>
+                                <label class="form-label" for="supply-qty">Cantidad Movida</label>
                                 <input type="number" id="supply-qty" class="form-control" placeholder="0.0" step="0.1" min="0.1" required>
+                                ${this.renderQuickQtyButtons('supply-qty', false, 'kg')}
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="supply-unit">Unidad de Medida</label>
@@ -577,93 +813,142 @@ const Components = {
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="supply-date">Fecha de Registro</label>
+                                <label class="form-label" for="supply-date">Fecha del Movimiento</label>
                                 <input type="date" id="supply-date" class="form-control" value="${todayStr}" required>
                             </div>
                         </div>
                         <!-- DYNAMIC FEEDING AREA FOR SUPPLIES -->
                         <div id="supply-feeding-details" class="mt-3 p-3 card" style="background-color: var(--bg-secondary); border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
-                            <h4 class="mb-3 text-success"><i class="fa-solid fa-seedling"></i> Registrar Alimentación de Tinas Relacionada</h4>
+                            <h4 class="mb-3 text-success"><i class="fa-solid fa-seedling"></i> Tinas Alimentadas asociadas</h4>
                             <p style="font-size: 0.85rem; color: var(--text-secondary);" class="mb-3">
-                                Selecciona qué tinas recibieron este insumo. La cantidad total ingresada arriba se dividirá equitativamente entre ellas.
+                                Selecciona qué tinas recibieron este alimento. La cantidad se dividirá equitativamente.
                             </p>
                             <div class="form-group mb-0" style="margin-bottom: 0;">
-                                <label class="form-label">Seleccionar Tinas Alimentadas</label>
-                                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0.5rem; max-height: 180px; overflow-y: auto; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background-color: var(--bg-primary);">
-                                    ${camas.length === 0 ? `
-                                        <div style="grid-column: 1/-1;" class="text-center text-secondary py-3">No hay tinas activas en este momento.</div>
-                                    ` : camas.map(c => {
-                                        const id = c[0];
-                                        const name = c[1].replace('Cama', 'Tina');
-                                        const group = c[4] || 'Sin Grupo';
-                                        return `
-                                            <label class="d-flex align-items-center gap-2 p-2 card mb-0 cursor-pointer" style="flex-direction: row; font-size: 0.8rem; background-color: var(--bg-secondary); border-color: var(--border-color); margin-bottom: 0; user-select: none;">
-                                                <input type="checkbox" class="supply-feed-tina-chk" value="${id}" style="margin-bottom: 0;">
-                                                <div style="display: flex; flex-direction: column;">
-                                                    <strong>${name}</strong>
-                                                    <span style="font-size: 0.7rem; color: var(--text-secondary);">${group}</span>
-                                                </div>
-                                            </label>
-                                        `;
-                                    }).join('')}
-                                </div>
-                                ${camas.length > 0 ? `
-                                    <div class="mt-2 d-flex gap-2">
-                                        <button type="button" id="btn-supply-select-all-tinas" class="btn btn-outline btn-xs"><i class="fa-solid fa-check-double"></i> Seleccionar Todas</button>
-                                        <button type="button" id="btn-supply-clear-tinas" class="btn btn-outline btn-xs"><i class="fa-solid fa-square-minus"></i> Limpiar</button>
-                                    </div>
-                                ` : ''}
+                                <label class="form-label">Toca las tinas que recibieron alimento hoy (por lote):</label>
+                                ${this.renderTinaSelection(camas, 'supply')}
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label class="form-label" for="supply-cost">Costo Total ($) (Opcional - crea transacción contable de gasto automáticamente)</label>
-                            <input type="number" id="supply-cost" class="form-control" placeholder="Dejar vacío si no aplica costo" step="0.01" min="0">
+                            <label class="form-label" for="supply-cost">Costo Total ($) (Opcional si es compra recién ingresada)</label>
+                            <input type="number" id="supply-cost" class="form-control" placeholder="Dejar vacío si no costó dinero" step="0.01" min="0">
+                            ${this.renderQuickQtyButtons('supply-cost', true)}
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">¿Quiénes colaboraron en esta tarea hoy?</label>
+                            ${this.renderCollaboratorsList(users, 'supply')}
                         </div>
 
                         <button type="submit" class="btn btn-primary btn-block btn-lg mt-3">
-                            <i class="fa-solid fa-floppy-disk"></i> Registrar Movimiento de Insumo
+                            <i class="fa-solid fa-floppy-disk"></i> Registrar Movimiento de Bodega
                         </button>
                     </form>
                 </div>
 
                 <!-- FORM SECTION 4: MACHINERY -->
                 <div id="form-maquinaria-section" class="card hidden">
-                    <h2 class="mb-3"><i class="fa-solid fa-screwdriver-wrench text-success"></i> 4. Registrar Maquinaria y Activos</h2>
+                    <h2 class="mb-3"><i class="fa-solid fa-screwdriver-wrench text-success"></i> 4. Registrar Herramientas y Máquinas</h2>
                     <p class="mb-3">Registra una nueva herramienta, equipo o máquina para el criadero. Si tiene un costo, se auto-generará un egreso en contabilidad.</p>
                     
                     <form id="add-machinery-form">
                         <div class="form-row-2">
                             <div class="form-group">
-                                <label class="form-label" for="machinery-name">Nombre de la Máquina / Equipo</label>
-                                <input type="text" id="machinery-name" class="form-control" placeholder="Ej: Trituradora de residuos, Termómetro digital" required>
+                                <label class="form-label" for="machinery-name">Nombre de la Máquina / Herramienta</label>
+                                <input type="text" id="machinery-name" class="form-control" placeholder="Ej: Trituradora de fruta, Balanza digital, etc" required>
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="machinery-date">Fecha de Adquisición</label>
+                                <label class="form-label" for="machinery-date">Fecha de Compra</label>
                                 <input type="date" id="machinery-date" class="form-control" value="${todayStr}" required>
                             </div>
                         </div>
                         <div class="form-row-2">
                             <div class="form-group">
-                                <label class="form-label" for="machinery-cost">Costo de Adquisición ($)</label>
+                                <label class="form-label" for="machinery-cost">Precio de Compra ($)</label>
                                 <input type="number" id="machinery-cost" class="form-control" placeholder="0.00" step="0.01" min="0" required>
+                                ${this.renderQuickQtyButtons('machinery-cost', true)}
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="machinery-status">Estado Operativo</label>
+                                <label class="form-label" for="machinery-status">Estado Operativo Inicial</label>
                                 <select id="machinery-status" class="form-control" required>
-                                    <option value="Operativo">Operativo (Listo para usar)</option>
+                                    <option value="Operativo">Operativo (Listo para usarse)</option>
                                     <option value="En Mantenimiento">En Mantenimiento</option>
                                     <option value="Fuera de servicio">Fuera de servicio</option>
                                 </select>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label" for="machinery-desc">Descripción / Observaciones</label>
+                            <label class="form-label" for="machinery-desc">Descripción / Observación corta</label>
                             <input type="text" id="machinery-desc" class="form-control" placeholder="Ej: Marca Bosch, capacidad 20L, comprado con garantía">
                         </div>
 
+                        <div class="form-group">
+                            <label class="form-label">¿Quiénes colaboraron en esta tarea hoy?</label>
+                            ${this.renderCollaboratorsList(users, 'machinery')}
+                        </div>
+
                         <button type="submit" class="btn btn-primary btn-block btn-lg mt-3">
-                            <i class="fa-solid fa-floppy-disk"></i> Registrar Maquinaria
+                            <i class="fa-solid fa-floppy-disk"></i> Registrar Nueva Herramienta
+                        </button>
+                    </form>
+                </div>
+
+                <!-- FORM SECTION 5: REVENUES / SALES -->
+                <div id="form-ingresos-section" class="card hidden">
+                    <h2 class="mb-3"><i class="fa-solid fa-hand-holding-dollar text-success"></i> 5. Apuntar una Venta (Ingresos por Ventas)</h2>
+                    <p class="mb-3">Registra los ingresos obtenidos por las ventas de los productos de tu criadero (larva viva, seca, abono, etc) o servicios prestados.</p>
+                    
+                    <form id="add-sale-form">
+                        <div class="form-row-3" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                            <div class="form-group">
+                                <label class="form-label" for="sale-product">Producto Vendido</label>
+                                <select id="sale-product" class="form-control" required>
+                                    <option value="Larva Fresca">Larva Fresca</option>
+                                    <option value="Larva Deshidratada">Larva Deshidratada</option>
+                                    <option value="Harina de Larva">Harina de Larva</option>
+                                    <option value="Aceite de Larva">Aceite de Larva</option>
+                                    <option value="Frass (Abono Orgánico)">Frass (Abono Orgánico)</option>
+                                    <option value="Pie de Cría (Huevos / Neonatos / Pupas)">Pie de Cría (Huevos/Pupas)</option>
+                                    <option value="Servicio de Gestión de Residuos">Servicio de Gestión de Residuos</option>
+                                    <option value="Otros Ingresos">Otros Ingresos</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="sale-qty">Cantidad</label>
+                                <input type="number" id="sale-qty" class="form-control" placeholder="0.0" step="0.1" min="0.1" required>
+                                ${this.renderQuickQtyButtons('sale-qty', false, 'unid')}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="sale-price">Precio Unitario ($)</label>
+                                <input type="number" id="sale-price" class="form-control" placeholder="0.00" step="0.01" min="0.01" required>
+                                ${this.renderQuickQtyButtons('sale-price', true)}
+                            </div>
+                        </div>
+                        
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label class="form-label" for="sale-client">Nombre del Cliente / Detalle</label>
+                                <input type="text" id="sale-client" class="form-control" placeholder="Ej: Cliente Juan Pérez, o Venta local" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="sale-date">Fecha de la Venta</label>
+                                <input type="date" id="sale-date" class="form-control" value="${todayStr}" required>
+                            </div>
+                        </div>
+
+                        <!-- Collaborators -->
+                        <div class="form-group">
+                            <label class="form-label">¿Quiénes ayudaron en esta tarea hoy? (Colaboradores)</label>
+                            ${this.renderCollaboratorsList(users, 'sale')}
+                        </div>
+
+                        <!-- Natural Language Dynamic Summary -->
+                        <div id="sale-natural-summary" class="alert-item success p-3 mb-3 hidden" style="border-left: 4px solid var(--text-success); background-color: rgba(34, 197, 94, 0.05); font-weight: bold; border-radius: var(--radius-sm); margin-bottom: 1rem;">
+                            <!-- Text will be injected by JS -->
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block btn-lg mt-3">
+                            <i class="fa-solid fa-wallet"></i> Registrar Venta e Ingreso de Dinero
                         </button>
                     </form>
                 </div>
@@ -676,6 +961,7 @@ const Components = {
         const secFinanzas = document.getElementById('form-finanzas-section');
         const secInsumos = document.getElementById('form-insumos-section');
         const secMaquinaria = document.getElementById('form-maquinaria-section');
+        const secIngresos = document.getElementById('form-ingresos-section');
 
         formTabs.forEach(tab => {
             tab.addEventListener('click', () => {
@@ -683,29 +969,121 @@ const Components = {
                 tab.classList.add('active');
 
                 const targetForm = tab.getAttribute('data-form');
+                secBitacora.classList.add('hidden');
+                secFinanzas.classList.add('hidden');
+                secInsumos.classList.add('hidden');
+                secMaquinaria.classList.add('hidden');
+                secIngresos.classList.add('hidden');
+
                 if (targetForm === 'section-bitacora') {
                     secBitacora.classList.remove('hidden');
-                    secFinanzas.classList.add('hidden');
-                    secInsumos.classList.add('hidden');
-                    secMaquinaria.classList.add('hidden');
                 } else if (targetForm === 'section-finanzas') {
-                    secBitacora.classList.add('hidden');
                     secFinanzas.classList.remove('hidden');
-                    secInsumos.classList.add('hidden');
-                    secMaquinaria.classList.add('hidden');
                 } else if (targetForm === 'section-insumos') {
-                    secBitacora.classList.add('hidden');
-                    secFinanzas.classList.add('hidden');
                     secInsumos.classList.remove('hidden');
-                    secMaquinaria.classList.add('hidden');
-                } else {
-                    secBitacora.classList.add('hidden');
-                    secFinanzas.classList.add('hidden');
-                    secInsumos.classList.add('hidden');
+                } else if (targetForm === 'section-maquinaria') {
                     secMaquinaria.classList.remove('hidden');
+                } else if (targetForm === 'section-ingresos') {
+                    secIngresos.classList.remove('hidden');
                 }
             });
         });
+
+        // TACTILE CARDS SELECTORS (Tinas & Collaborators)
+        container.querySelectorAll('.tina-select-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const checkbox = card.querySelector('input[type="checkbox"]');
+                checkbox.checked = !checkbox.checked;
+                if (checkbox.checked) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            });
+        });
+
+        container.querySelectorAll('.btn-select-group').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const groupId = btn.getAttribute('data-group-id');
+                const prefix = btn.getAttribute('data-prefix');
+                const groupCards = container.querySelectorAll(`.tina-select-card[data-prefix="${prefix}"] input.tina-checkbox-group-${groupId}`);
+                
+                const checkboxes = Array.from(groupCards);
+                const allChecked = checkboxes.every(cb => cb.checked);
+                
+                checkboxes.forEach(cb => {
+                    cb.checked = !allChecked;
+                    const card = cb.closest('.tina-select-card');
+                    if (cb.checked) {
+                        card.classList.add('selected');
+                    } else {
+                        card.classList.remove('selected');
+                    }
+                });
+            });
+        });
+
+        container.querySelectorAll('.collab-select-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const checkbox = card.querySelector('input[type="checkbox"]');
+                checkbox.checked = !checkbox.checked;
+                if (checkbox.checked) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            });
+        });
+
+        // QUICK QUANTITY BUTTONS
+        container.querySelectorAll('.quick-qty-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const inputId = btn.getAttribute('data-input');
+                const delta = parseFloat(btn.getAttribute('data-delta'));
+                const input = document.getElementById(inputId);
+                const currentVal = parseFloat(input.value) || 0;
+                input.value = Math.max(0, currentVal + delta).toFixed(inputId.includes('price') || inputId.includes('amount') || inputId.includes('cost') ? 2 : 1);
+                input.dispatchEvent(new Event('input'));
+            });
+        });
+
+        container.querySelectorAll('.quick-qty-btn-reset').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const inputId = btn.getAttribute('data-input');
+                const input = document.getElementById(inputId);
+                input.value = '';
+                input.dispatchEvent(new Event('input'));
+            });
+        });
+
+        // NATURAL LANGUAGE SUMMARY FOR SALES
+        const saleProduct = document.getElementById('sale-product');
+        const saleQty = document.getElementById('sale-qty');
+        const salePrice = document.getElementById('sale-price');
+        const saleSummary = document.getElementById('sale-natural-summary');
+
+        const updateSaleSummary = () => {
+            const product = saleProduct.value;
+            const qty = parseFloat(saleQty.value) || 0;
+            const price = parseFloat(salePrice.value) || 0;
+            const total = qty * price;
+            
+            if (qty > 0 && price > 0) {
+                saleSummary.innerHTML = `<i class="fa-solid fa-circle-info"></i> Resumen: Vas a registrar una venta de <strong>${qty.toFixed(1)}</strong> unidades/kg de <strong>${product}</strong> a un precio de <strong>$${price.toFixed(2)}</strong> cada una, por un total de <span style="font-size: 1.1rem; color: var(--brand-primary); font-weight: 800;">$${total.toFixed(2)}</span>.`;
+                saleSummary.classList.remove('hidden');
+            } else {
+                saleSummary.classList.add('hidden');
+            }
+        };
+
+        if (saleProduct) {
+            saleProduct.addEventListener('change', updateSaleSummary);
+            saleQty.addEventListener('input', updateSaleSummary);
+            salePrice.addEventListener('input', updateSaleSummary);
+        }
 
         // Set up Report/Bitácora photos drag & drop
         const fileInput = document.getElementById('report-photos');
@@ -729,6 +1107,50 @@ const Components = {
             this.handleFileSelection(fileInput.files, previewContainer);
         });
 
+        // Dynamic Quick Qty Button Label updates based on selected unit
+        const reportFeedUnit = document.getElementById('report-feed-unit');
+        const updateReportFeedQtyLabels = () => {
+            if (!reportFeedUnit) return;
+            const unit = reportFeedUnit.value;
+            const getUnitLabel = (delta) => {
+                const absDelta = Math.abs(delta);
+                if (unit === 'baldes') return absDelta === 1 ? 'balde' : 'baldes';
+                if (unit === 'sacos') return absDelta === 1 ? 'saco' : 'sacos';
+                return unit;
+            };
+            container.querySelectorAll(`.quick-qty-btn[data-input="report-feed-qty"]`).forEach(btn => {
+                const delta = parseFloat(btn.getAttribute('data-delta'));
+                const prefix = delta > 0 ? `+${delta}` : `${delta}`;
+                btn.textContent = `${prefix} ${getUnitLabel(delta)}`;
+            });
+        };
+        if (reportFeedUnit) {
+            reportFeedUnit.addEventListener('change', updateReportFeedQtyLabels);
+            updateReportFeedQtyLabels();
+        }
+
+        const supplyUnitSelect = document.getElementById('supply-unit');
+        const updateSupplyQtyLabels = () => {
+            if (!supplyUnitSelect) return;
+            const unit = supplyUnitSelect.value;
+            const getUnitLabel = (delta) => {
+                const absDelta = Math.abs(delta);
+                if (unit === 'baldes') return absDelta === 1 ? 'balde' : 'baldes';
+                if (unit === 'sacos') return absDelta === 1 ? 'saco' : 'sacos';
+                if (unit === 'unidades') return absDelta === 1 ? 'unid' : 'unids';
+                return unit;
+            };
+            container.querySelectorAll(`.quick-qty-btn[data-input="supply-qty"]`).forEach(btn => {
+                const delta = parseFloat(btn.getAttribute('data-delta'));
+                const prefix = delta > 0 ? `+${delta}` : `${delta}`;
+                btn.textContent = `${prefix} ${getUnitLabel(delta)}`;
+            });
+        };
+        if (supplyUnitSelect) {
+            supplyUnitSelect.addEventListener('change', updateSupplyQtyLabels);
+            updateSupplyQtyLabels();
+        }
+
         // Report category dynamic feeding section toggle
         const reportCategory = document.getElementById('report-category');
         const feedingReportDetails = document.getElementById('feeding-report-details');
@@ -745,20 +1167,6 @@ const Components = {
             }
         });
 
-        // Report Select All / Clear buttons
-        const btnReportSelectAll = document.getElementById('btn-report-select-all-tinas');
-        const btnReportClear = document.getElementById('btn-report-clear-tinas');
-        if (btnReportSelectAll && btnReportClear) {
-            btnReportSelectAll.addEventListener('click', (e) => {
-                e.preventDefault();
-                document.querySelectorAll('.report-feed-tina-chk').forEach(chk => chk.checked = true);
-            });
-            btnReportClear.addEventListener('click', (e) => {
-                e.preventDefault();
-                document.querySelectorAll('.report-feed-tina-chk').forEach(chk => chk.checked = false);
-            });
-        }
-
         // Supply action dynamic feeding section toggle
         const supplyAction = document.getElementById('supply-action');
         const supplyFeedingDetails = document.getElementById('supply-feeding-details');
@@ -768,23 +1176,12 @@ const Components = {
                 supplyFeedingDetails.classList.remove('hidden');
             } else {
                 supplyFeedingDetails.classList.add('hidden');
-                document.querySelectorAll('.supply-feed-tina-chk').forEach(chk => chk.checked = false);
+                container.querySelectorAll('.tina-select-card[data-prefix="supply"]').forEach(c => {
+                    c.classList.remove('selected');
+                    c.querySelector('input').checked = false;
+                });
             }
         });
-
-        // Supply Select All / Clear buttons
-        const btnSupplySelectAll = document.getElementById('btn-supply-select-all-tinas');
-        const btnSupplyClear = document.getElementById('btn-supply-clear-tinas');
-        if (btnSupplySelectAll && btnSupplyClear) {
-            btnSupplySelectAll.addEventListener('click', (e) => {
-                e.preventDefault();
-                document.querySelectorAll('.supply-feed-tina-chk').forEach(chk => chk.checked = true);
-            });
-            btnSupplyClear.addEventListener('click', (e) => {
-                e.preventDefault();
-                document.querySelectorAll('.supply-feed-tina-chk').forEach(chk => chk.checked = false);
-            });
-        }
 
         // FORM SUBMIT 1: BITÁCORA / REPORT & PHOTOS
         document.getElementById('add-report-form').addEventListener('submit', async (e) => {
@@ -800,7 +1197,7 @@ const Components = {
             let totalQty = 0;
 
             if (reportCat === 'Alimentación') {
-                const selectedChks = document.querySelectorAll('.report-feed-tina-chk:checked');
+                const selectedChks = container.querySelectorAll('input.report-tina-chk:checked');
                 if (selectedChks.length === 0) {
                     alert("Por favor, selecciona al menos una tina alimentada.");
                     return;
@@ -814,7 +1211,7 @@ const Components = {
                     return;
                 }
                 if (totalQty <= 0) {
-                    alert("Por favor, ingresa una cantidad válida mayor a 0 kg.");
+                    alert("Por favor, ingresa una cantidad válida mayor a 0.");
                     return;
                 }
             }
@@ -835,7 +1232,14 @@ const Components = {
                 const nowTime = new Date().toTimeString().split(' ')[0]; // HH:MM:SS
                 const formattedDate = `${reportDateVal} ${nowTime}`;
 
-                const reportDesc = document.getElementById('report-desc').value;
+                // Collaborators metadata
+                const selectedCollabs = Array.from(container.querySelectorAll('input.report-collab-chk:checked')).map(cb => cb.value);
+                let collabMeta = '';
+                if (selectedCollabs.length > 0) {
+                    collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
+                }
+
+                const reportDesc = collabMeta + document.getElementById('report-desc').value;
                 const photosString = photoIds.join(',');
 
                 const reportValues = [[
@@ -893,7 +1297,7 @@ const Components = {
                 await GoogleAPI.appendSheetData('Reportes!A:F', reportValues);
                 
                 hideLoading();
-                alert("¡Bitácora registrada con éxito!");
+                alert("¡Bitácora y novedades registradas con éxito!");
 
                 // Reset
                 document.getElementById('add-report-form').reset();
@@ -904,6 +1308,8 @@ const Components = {
                 feedingReportDetails.classList.add('hidden');
                 document.getElementById('report-feed-insumo').required = false;
                 document.getElementById('report-feed-qty').required = false;
+                container.querySelectorAll('.collab-select-card[data-prefix="report"]').forEach(c => c.classList.remove('selected'));
+                container.querySelectorAll('.tina-select-card[data-prefix="report"]').forEach(c => c.classList.remove('selected'));
                 
                 // Redirect
                 window.location.hash = '#reports-list';
@@ -914,7 +1320,7 @@ const Components = {
             }
         });
 
-        // FORM SUBMIT 2: FINANCES
+        // FORM SUBMIT 2: FINANCES (Expenses)
         document.getElementById('add-finance-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             if (GoogleAPI.user.role === 'Observador') {
@@ -922,7 +1328,7 @@ const Components = {
                 return;
             }
 
-            showLoading("Registrando transacción contable...");
+            showLoading("Registrando gasto...");
 
             try {
                 const finId = `FIN_${Date.now()}`;
@@ -930,7 +1336,15 @@ const Components = {
                 const finAmount = parseFloat(document.getElementById('finance-amount').value);
                 const finCat = document.getElementById('finance-category').value.trim();
                 const finDate = document.getElementById('finance-date').value;
-                const finDesc = document.getElementById('finance-desc').value.trim();
+
+                // Collaborators metadata
+                const selectedCollabs = Array.from(container.querySelectorAll('input.finance-collab-chk:checked')).map(cb => cb.value);
+                let collabMeta = '';
+                if (selectedCollabs.length > 0) {
+                    collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
+                }
+
+                const finDesc = collabMeta + document.getElementById('finance-desc').value.trim();
 
                 const financeValues = [[
                     finId,
@@ -945,22 +1359,23 @@ const Components = {
                 await GoogleAPI.appendSheetData('Finanzas!A:G', financeValues);
 
                 hideLoading();
-                alert("¡Transacción contable registrada con éxito!");
+                alert("¡Gasto registrado con éxito!");
 
                 // Reset
                 document.getElementById('add-finance-form').reset();
                 document.getElementById('finance-date').value = todayStr;
+                container.querySelectorAll('.collab-select-card[data-prefix="finance"]').forEach(c => c.classList.remove('selected'));
                 
                 // Redirect
                 window.location.hash = '#finances';
             } catch (err) {
                 console.error("Finance submit error", err);
                 hideLoading();
-                alert(`Error al registrar transacción: ${err.message}`);
+                alert(`Error al registrar gasto: ${err.message}`);
             }
         });
 
-        // FORM SUBMIT 3: SUPPLIES
+        // FORM SUBMIT 3: SUPPLIES (Warehouse)
         document.getElementById('add-supply-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             if (GoogleAPI.user.role === 'Observador') {
@@ -971,11 +1386,11 @@ const Components = {
             const supplyAction = document.getElementById('supply-action').value;
             let selectedTinas = [];
             if (supplyAction === 'Utilización') {
-                const selectedChks = document.querySelectorAll('.supply-feed-tina-chk:checked');
+                const selectedChks = container.querySelectorAll('input.supply-tina-chk:checked');
                 selectedTinas = Array.from(selectedChks).map(chk => chk.value);
             }
 
-            showLoading("Registrando movimiento de insumo...");
+            showLoading("Registrando movimiento de bodega...");
 
             try {
                 const supId = `SUP_${Date.now()}`;
@@ -985,6 +1400,13 @@ const Components = {
                 const supplyUnit = document.getElementById('supply-unit').value;
                 const supplyDate = document.getElementById('supply-date').value;
                 const supplyCost = parseFloat(document.getElementById('supply-cost').value) || 0;
+
+                // Collaborators metadata
+                const selectedCollabs = Array.from(container.querySelectorAll('input.supply-collab-chk:checked')).map(cb => cb.value);
+                let collabMeta = '';
+                if (selectedCollabs.length > 0) {
+                    collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
+                }
 
                 const supplyValues = [[
                     supId,
@@ -1019,7 +1441,7 @@ const Components = {
                             supplyName,
                             qtyPerTina,
                             GoogleAPI.user.name,
-                            `Alimentación manual vía Movimiento de Insumo ${supId} (${supplyUnit})`
+                            `Alimentación manual vía Movimiento de Insumo ${supId} (${supplyUnit}) ${collabMeta}`
                         ];
                         nextOrder++;
                         return row;
@@ -1030,7 +1452,7 @@ const Components = {
 
                 await GoogleAPI.appendSheetData('Insumos!A:I', supplyValues);
 
-                // If supply has cost and action is "Adición" (or even "Utilización"), auto-generate a financial record of Gasto
+                // If supply has cost, auto-generate a financial record of Gasto
                 if (supplyCost > 0) {
                     const finId = `FIN_${Date.now()}_SUP`;
                     const financeValues = [[
@@ -1040,17 +1462,19 @@ const Components = {
                         'Gasto',
                         'Operativo: Compra de Insumos',
                         supplyCost,
-                        `Compra auto-registrada de ${supplyQty} ${supplyUnit} de ${supplyName}`
+                        `${collabMeta}Compra auto-registrada de ${supplyQty} ${supplyUnit} de ${supplyName}`
                     ]];
                     await GoogleAPI.appendSheetData('Finanzas!A:G', financeValues);
                 }
 
                 hideLoading();
-                alert("¡Movimiento de insumo registrado con éxito!");
+                alert("¡Movimiento de bodega registrado con éxito!");
 
                 // Reset
                 document.getElementById('add-supply-form').reset();
                 document.getElementById('supply-date').value = todayStr;
+                container.querySelectorAll('.collab-select-card[data-prefix="supply"]').forEach(c => c.classList.remove('selected'));
+                container.querySelectorAll('.tina-select-card[data-prefix="supply"]').forEach(c => c.classList.remove('selected'));
                 
                 // Show dynamic area again since action resets to "Utilización"
                 supplyFeedingDetails.classList.remove('hidden');
@@ -1060,11 +1484,11 @@ const Components = {
             } catch (err) {
                 console.error("Supply submit error", err);
                 hideLoading();
-                alert(`Error al registrar insumo: ${err.message}`);
+                alert(`Error al registrar bodega: ${err.message}`);
             }
         });
 
-        // FORM SUBMIT 4: MACHINERY
+        // FORM SUBMIT 4: MACHINERY (Tools)
         const addMachineryForm = document.getElementById('add-machinery-form');
         if (addMachineryForm) {
             addMachineryForm.addEventListener('submit', async (e) => {
@@ -1074,23 +1498,32 @@ const Components = {
                     return;
                 }
 
-                showLoading("Registrando maquinaria/activo...");
+                showLoading("Registrando herramienta/equipo...");
 
                 try {
                     const name = document.getElementById('machinery-name').value.trim();
                     const date = document.getElementById('machinery-date').value;
                     const cost = parseFloat(document.getElementById('machinery-cost').value) || 0;
                     const status = document.getElementById('machinery-status').value;
-                    const desc = document.getElementById('machinery-desc').value.trim();
+
+                    // Collaborators metadata
+                    const selectedCollabs = Array.from(container.querySelectorAll('input.machinery-collab-chk:checked')).map(cb => cb.value);
+                    let collabMeta = '';
+                    if (selectedCollabs.length > 0) {
+                        collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
+                    }
+
+                    const desc = collabMeta + document.getElementById('machinery-desc').value.trim();
 
                     await GoogleAPI.addMaquinaria(name, date, cost, status, desc);
 
                     hideLoading();
-                    alert("¡Maquinaria/Activo registrado con éxito!");
+                    alert("¡Herramienta/Equipo registrado con éxito!");
 
                     // Reset
                     addMachineryForm.reset();
                     document.getElementById('machinery-date').value = todayStr;
+                    container.querySelectorAll('.collab-select-card[data-prefix="machinery"]').forEach(c => c.classList.remove('selected'));
 
                     // Redirect to supplies tab
                     window.location.hash = '#supplies';
@@ -1098,7 +1531,65 @@ const Components = {
                     console.error("Machinery submit error", err);
                     hideLoading();
                     const errMsg = err.result?.error?.message || err.message || "Error desconocido";
-                    alert(`Error al registrar maquinaria: ${errMsg}`);
+                    alert(`Error al registrar herramienta: ${errMsg}`);
+                }
+            });
+        }
+
+        // FORM SUBMIT 5: SALES / REVENUES (Ingresos)
+        const addSaleForm = document.getElementById('add-sale-form');
+        if (addSaleForm) {
+            addSaleForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (GoogleAPI.user.role === 'Observador') {
+                    alert("Acceso denegado: El rol 'Observador' no puede ingresar datos.");
+                    return;
+                }
+
+                showLoading("Registrando venta e ingreso...");
+
+                try {
+                    const product = saleProduct.value;
+                    const qty = parseFloat(saleQty.value) || 0;
+                    const price = parseFloat(salePrice.value) || 0;
+                    const client = document.getElementById('sale-client').value.trim();
+                    const date = document.getElementById('sale-date').value;
+                    const totalAmount = qty * price;
+
+                    // Collaborators metadata
+                    const selectedCollabs = Array.from(container.querySelectorAll('input.sale-collab-chk:checked')).map(cb => cb.value);
+                    let collabMeta = '';
+                    if (selectedCollabs.length > 0) {
+                        collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
+                    }
+
+                    const txRow = [
+                        `TX_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+                        'MANUAL',
+                        date,
+                        'Ingreso',
+                        `Venta: ${product}`,
+                        totalAmount.toString(),
+                        `${collabMeta}Venta a ${client} (${qty} x $${price})`
+                    ];
+
+                    await GoogleAPI.appendSheetData('Finanzas!A:G', [txRow]);
+
+                    hideLoading();
+                    alert("¡Venta e ingreso contable registrados con éxito!");
+
+                    // Reset
+                    addSaleForm.reset();
+                    document.getElementById('sale-date').value = todayStr;
+                    saleSummary.classList.add('hidden');
+                    container.querySelectorAll('.collab-select-card[data-prefix="sale"]').forEach(c => c.classList.remove('selected'));
+
+                    // Redirect
+                    window.location.hash = '#finances';
+                } catch (err) {
+                    console.error("Sale submit error", err);
+                    hideLoading();
+                    alert(`Error al registrar venta: ${err.message}`);
                 }
             });
         }
@@ -1526,7 +2017,7 @@ const Components = {
                                             <td>${row[4]}</td>
                                             <td class="${row[3] === 'Ingreso' ? 'text-success' : 'text-danger'}"><strong>$${parseFloat(row[5]).toFixed(2)}</strong></td>
                                             <td>${row[6]}</td>
-                                            <td><small class="text-secondary">${row[1] || 'Manual'}</small></td>
+                                            <td><small class="text-secondary">${row[1] && row[1].startsWith('REP_') ? `<a href="#reports-list" style="color: var(--brand-primary); font-weight: bold; text-decoration: underline;"><i class="fa-solid fa-file-lines"></i> Ver Reporte</a>` : (row[1] || 'Manual')}</small></td>
                                         </tr>
                                     `).join('')}
                                 </tbody>

@@ -276,11 +276,12 @@ const App = {
 
         // Set top header title
         let pageTitle = 'Panel General';
-        if (page === 'add-report') pageTitle = 'Nuevo Reporte Diario';
-        else if (page === 'reports-list') pageTitle = 'Bitácora Histórica';
-        else if (page === 'finances') pageTitle = 'Contabilidad Criadero';
-        else if (page === 'supplies') pageTitle = 'Inventario de Insumos';
+        if (page === 'add-report') pageTitle = 'Registrar Tareas de Hoy';
+        else if (page === 'reports-list') pageTitle = 'Novedades Guardadas';
+        else if (page === 'finances') pageTitle = 'Ingresos y Gastos';
+        else if (page === 'supplies') pageTitle = 'Bodega / Alimentos';
         else if (page === 'feeding') pageTitle = 'Control de Tinas';
+        else if (page === 'climatology') pageTitle = 'Clima de las Salas (Termómetros)';
         
         this.elements.currentPageTitle.textContent = pageTitle;
 
@@ -291,6 +292,9 @@ const App = {
         switch (page) {
             case 'dashboard':
                 await Components.renderDashboard('content-area', showLoadingFn, hideLoadingFn);
+                break;
+            case 'climatology':
+                await Components.renderClimatology('content-area', showLoadingFn, hideLoadingFn);
                 break;
             case 'add-report':
                 await Components.renderAddReport('content-area', showLoadingFn, hideLoadingFn);

@@ -795,6 +795,22 @@ const GoogleAPI = {
         }
         const rowNum = idx + 1;
         await this.updateSheetRow(`Maquinaria!E${rowNum}:E${rowNum}`, [[nuevoEstado]]);
+    },
+
+    /**
+     * Get all users
+     */
+    async getUsuarios() {
+        try {
+            const resp = await gapi.client.sheets.spreadsheets.values.get({
+                spreadsheetId: this.config.spreadsheetId,
+                range: 'Usuarios!A:C'
+            });
+            return resp.result.values || [];
+        } catch (err) {
+            console.error("Failed to fetch users", err);
+            return [];
+        }
     }
 };
 
