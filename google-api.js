@@ -28,9 +28,12 @@ const GoogleAPI = {
         const stored = localStorage.getItem('bsf_biomanager_config');
         if (stored) {
             this.config = JSON.parse(stored);
-            return true;
+        } else if (typeof DEFAULT_CONFIG !== 'undefined' && DEFAULT_CONFIG.apiKey && DEFAULT_CONFIG.clientId && DEFAULT_CONFIG.spreadsheetId) {
+            this.config = { ...DEFAULT_CONFIG };
+        } else {
+            this.config = null;
         }
-        return false;
+        return this.config !== null;
     },
 
     /**
