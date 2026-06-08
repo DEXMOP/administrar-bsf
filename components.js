@@ -2507,6 +2507,19 @@ const Components = {
                             <i class="fa-solid fa-power-off"></i> Inhabilitar Todas las Tinas
                         </button>
                     </div>
+
+                    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border-color);">
+                        <h4 class="mb-2" style="color: var(--brand-primary);"><i class="fa-solid fa-key"></i> Credenciales de Google API</h4>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary);" class="mb-3">
+                            Copia estos códigos para rellenar el archivo <code>config.js</code>:
+                        </p>
+                        <div style="font-size: 0.8rem; background: var(--bg-primary); padding: 0.75rem; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 0.5rem; word-break: break-all; user-select: all; text-align: left;">
+                            <div><strong>Google API Key:</strong> <br><span style="font-family: monospace; color: var(--text-warning);">${GoogleAPI.config?.apiKey || ''}</span></div>
+                            <div class="mt-2"><strong>Google Client ID:</strong> <br><span style="font-family: monospace; color: var(--text-warning);">${GoogleAPI.config?.clientId || ''}</span></div>
+                            <div class="mt-2"><strong>Spreadsheet ID:</strong> <br><span style="font-family: monospace; color: var(--text-warning);">${GoogleAPI.config?.spreadsheetId || ''}</span></div>
+                            <div class="mt-2"><strong>Drive Folder ID:</strong> <br><span style="font-family: monospace; color: var(--text-warning);">${GoogleAPI.config?.driveFolderId || ''}</span></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
