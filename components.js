@@ -3,6 +3,15 @@
  * Dynamically renders the application content
  */
 
+/**
+ * Helper to extract feeding unit from observations
+ */
+function getFeedingUnit(obs) {
+    if (!obs) return 'kg';
+    const match = obs.match(/\((baldes|sacos|kg|L|unidades|g)\)/i);
+    return match ? match[1] : 'kg';
+}
+
 const Components = {
     // Shared state for selected files in report creation
     selectedFiles: [],
@@ -357,6 +366,7 @@ const Components = {
                     <span class="filter-tab active" data-form="section-bitacora" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-notes-medical"></i> Registrar Bitácora (Fotos)</span>
                     <span class="filter-tab" data-form="section-finanzas" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-scale-balanced"></i> Registrar Contabilidad</span>
                     <span class="filter-tab" data-form="section-insumos" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-boxes-stacked"></i> Registrar Insumo / Stock</span>
+                    <span class="filter-tab" data-form="section-maquinaria" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-screwdriver-wrench"></i> Registrar Maquinaria</span>
                 </div>
 
                 <!-- FORM SECTION 1: REPORT & PHOTOS -->
@@ -385,21 +395,31 @@ const Components = {
                         <!-- DYNAMIC FEEDING AREA FOR REPORT -->
                         <div id="feeding-report-details" class="hidden mt-3 p-3 card" style="background-color: var(--bg-secondary); border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
                             <h4 class="mb-3 text-success"><i class="fa-solid fa-seedling"></i> Distribución de Alimento (Tinas)</h4>
-                            <div class="form-row-2">
+                            <div class="form-row-3" style="display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 1rem;">
                                 <div class="form-group mb-0" style="margin-bottom: 0;">
-                                    <label class="form-label" for="report-feed-insumo">Insumo / Alimento Suministrado</label>
+                                    <label class="form-label" for="report-feed-insumo">Insumo / Alimento</label>
                                     <input type="text" id="report-feed-insumo" class="form-control" list="report-feed-names-list" placeholder="Ej: Salvado de Trigo">
                                     <datalist id="report-feed-names-list">
                                         <option value="Salvado de Trigo">
                                         <option value="Residuos Fruta / Verdura">
                                         <option value="Afrecho de Cerveza">
                                         <option value="Sustrato de Atracción">
+                                        <option value="Aserrín">
+                                        <option value="Restos de Fruta">
                                     </datalist>
                                 </div>
                                 <div class="form-group mb-0" style="margin-bottom: 0;">
-                                    <label class="form-label" for="report-feed-qty">Cantidad Total Utilizada (kg)</label>
+                                    <label class="form-label" for="report-feed-qty">Cantidad Total</label>
                                     <input type="number" id="report-feed-qty" class="form-control" placeholder="0.0" step="0.1" min="0.1">
-                                    <small class="form-text text-secondary">La cantidad se dividirá equitativamente entre las tinas seleccionadas.</small>
+                                </div>
+                                <div class="form-group mb-0" style="margin-bottom: 0;">
+                                    <label class="form-label" for="report-feed-unit">Unidad</label>
+                                    <select id="report-feed-unit" class="form-control" style="padding: 0.5rem;">
+                                        <option value="kg">kg</option>
+                                        <option value="baldes">baldes</option>
+                                        <option value="sacos">sacos</option>
+                                        <option value="L">L</option>
+                                    </select>
                                 </div>
                             </div>
                             <div class="form-group mt-3 mb-0" style="margin-bottom: 0;">
@@ -458,14 +478,14 @@ const Components = {
                 <!-- FORM SECTION 2: FINANCES -->
                 <div id="form-finanzas-section" class="card hidden">
                     <h2 class="mb-3"><i class="fa-solid fa-scale-balanced text-success"></i> 2. Transacción Contable del Criadero</h2>
-                    <p class="mb-3">Registra compras de sustratos, herramientas, cobros por ventas de larvas vivas, abono (frass) o cualquier otro movimiento financiero.</p>
+                    <p class="mb-3">Registra compras de sustratos, herramientas, cobros por ventas de larvas vivas, abono (frass), servicios públicos o cualquier otro movimiento financiero.</p>
                     
                     <form id="add-finance-form">
                         <div class="form-row-2">
                             <div class="form-group">
                                 <label class="form-label" for="finance-type">Tipo de Operación</label>
                                 <select id="finance-type" class="form-control" required>
-                                    <option value="Gasto">Gasto / Egreso (Alimento, equipos, etc)</option>
+                                    <option value="Gasto">Gasto / Egreso (Alimento, luz, sueldos, etc)</option>
                                     <option value="Ingreso">Ingreso / Venta (Venta larva, abono frass, etc)</option>
                                 </select>
                             </div>
@@ -479,13 +499,15 @@ const Components = {
                                 <label class="form-label" for="finance-category">Categoría Financiera</label>
                                 <input type="text" id="finance-category" class="form-control" list="finance-cat-list" placeholder="Selecciona o escribe una..." required>
                                 <datalist id="finance-cat-list">
-                                    <option value="Alimento / Sustrato">
+                                    <option value="Servicios: Luz / Agua">
+                                    <option value="Logística: Transporte de Sustrato">
+                                    <option value="Personal: Pago a Trabajadores">
+                                    <option value="Operativo: Compra de Insumos">
+                                    <option value="Activos: Compra de Maquinaria">
                                     <option value="Venta Larva Viva">
                                     <option value="Venta Harina BSF">
                                     <option value="Venta Frass (Abono)">
-                                    <option value="Infraestructura y Jaulas">
-                                    <option value="Electricidad / Servicios">
-                                    <option value="Herramientas y Limpieza">
+                                    <option value="Otros Gastos">
                                 </datalist>
                             </div>
                             <div class="form-group">
@@ -495,7 +517,7 @@ const Components = {
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="finance-desc">Detalle del Movimiento</label>
-                            <input type="text" id="finance-desc" class="form-control" placeholder="Ej: Compra de 20kg salvado de trigo" required>
+                            <input type="text" id="finance-desc" class="form-control" placeholder="Ej: Pago de recibo de luz de Mayo" required>
                         </div>
 
                         <button type="submit" class="btn btn-primary btn-block btn-lg mt-3">
@@ -507,18 +529,25 @@ const Components = {
                 <!-- FORM SECTION 3: SUPPLIES -->
                 <div id="form-insumos-section" class="card hidden">
                     <h2 class="mb-3"><i class="fa-solid fa-boxes-stacked text-success"></i> 3. Registro de Inventario de Insumos</h2>
-                    <p class="mb-3">Añade stock recién comprado o registra consumos de insumos de tu bodega de cría.</p>
+                    <p class="mb-3">Añade stock recién comprado o registra consumos de insumos de tu bodega de cría (sustratos, cajas, etc).</p>
                     
                     <form id="add-supply-form">
-                        <div class="form-row-2">
+                        <div class="form-row-3" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
                             <div class="form-group">
-                                <label class="form-label" for="supply-name">Nombre del Insumo / Alimento</label>
-                                <input type="text" id="supply-name" class="form-control" list="supply-names-list" placeholder="Selecciona o escribe..." required>
+                                <label class="form-label" for="supply-category">Categoría</label>
+                                <select id="supply-category" class="form-control" required>
+                                    <option value="Sustrato">Sustrato (Alimentación)</option>
+                                    <option value="Insumo General">Insumo General (Limpieza, cajas, etc)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="supply-name">Nombre del Insumo</label>
+                                <input type="text" id="supply-name" class="form-control" list="supply-names-list" placeholder="Ej: Aserrín" required>
                                 <datalist id="supply-names-list">
+                                    <option value="Aserrín">
+                                    <option value="Restos de Fruta">
                                     <option value="Salvado de Trigo">
-                                    <option value="Residuos Fruta / Verdura">
                                     <option value="Afrecho de Cerveza">
-                                    <option value="Agua">
                                     <option value="Sustrato de Atracción">
                                     <option value="Cajas / Bandejas de Engorde">
                                 </datalist>
@@ -526,8 +555,8 @@ const Components = {
                             <div class="form-group">
                                 <label class="form-label" for="supply-action">Acción Realizada</label>
                                 <select id="supply-action" class="form-control" required>
-                                    <option value="Utilización">Utilización (Suministrar a camas/larvas)</option>
-                                    <option value="Adición">Adición (Compra / Entrada al inventario)</option>
+                                    <option value="Utilización">Utilización (Suministrar a tinas)</option>
+                                    <option value="Adición">Adición (Compra / Entrada a stock)</option>
                                 </select>
                             </div>
                         </div>
@@ -540,6 +569,8 @@ const Components = {
                                 <label class="form-label" for="supply-unit">Unidad de Medida</label>
                                 <select id="supply-unit" class="form-control" required>
                                     <option value="kg">Kilogramos (kg)</option>
+                                    <option value="baldes">Baldes (restos de fruta)</option>
+                                    <option value="sacos">Sacos (aserrín/salvado)</option>
                                     <option value="L">Litros (L)</option>
                                     <option value="unidades">Unidades (unids)</option>
                                     <option value="g">Gramos (g)</option>
@@ -595,6 +626,47 @@ const Components = {
                         </button>
                     </form>
                 </div>
+
+                <!-- FORM SECTION 4: MACHINERY -->
+                <div id="form-maquinaria-section" class="card hidden">
+                    <h2 class="mb-3"><i class="fa-solid fa-screwdriver-wrench text-success"></i> 4. Registrar Maquinaria y Activos</h2>
+                    <p class="mb-3">Registra una nueva herramienta, equipo o máquina para el criadero. Si tiene un costo, se auto-generará un egreso en contabilidad.</p>
+                    
+                    <form id="add-machinery-form">
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label class="form-label" for="machinery-name">Nombre de la Máquina / Equipo</label>
+                                <input type="text" id="machinery-name" class="form-control" placeholder="Ej: Trituradora de residuos, Termómetro digital" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="machinery-date">Fecha de Adquisición</label>
+                                <input type="date" id="machinery-date" class="form-control" value="${todayStr}" required>
+                            </div>
+                        </div>
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label class="form-label" for="machinery-cost">Costo de Adquisición ($)</label>
+                                <input type="number" id="machinery-cost" class="form-control" placeholder="0.00" step="0.01" min="0" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="machinery-status">Estado Operativo</label>
+                                <select id="machinery-status" class="form-control" required>
+                                    <option value="Operativo">Operativo (Listo para usar)</option>
+                                    <option value="En Mantenimiento">En Mantenimiento</option>
+                                    <option value="Fuera de servicio">Fuera de servicio</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="machinery-desc">Descripción / Observaciones</label>
+                            <input type="text" id="machinery-desc" class="form-control" placeholder="Ej: Marca Bosch, capacidad 20L, comprado con garantía">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block btn-lg mt-3">
+                            <i class="fa-solid fa-floppy-disk"></i> Registrar Maquinaria
+                        </button>
+                    </form>
+                </div>
             </div>
         `;
 
@@ -603,6 +675,7 @@ const Components = {
         const secBitacora = document.getElementById('form-bitacora-section');
         const secFinanzas = document.getElementById('form-finanzas-section');
         const secInsumos = document.getElementById('form-insumos-section');
+        const secMaquinaria = document.getElementById('form-maquinaria-section');
 
         formTabs.forEach(tab => {
             tab.addEventListener('click', () => {
@@ -614,14 +687,22 @@ const Components = {
                     secBitacora.classList.remove('hidden');
                     secFinanzas.classList.add('hidden');
                     secInsumos.classList.add('hidden');
+                    secMaquinaria.classList.add('hidden');
                 } else if (targetForm === 'section-finanzas') {
                     secBitacora.classList.add('hidden');
                     secFinanzas.classList.remove('hidden');
                     secInsumos.classList.add('hidden');
-                } else {
+                    secMaquinaria.classList.add('hidden');
+                } else if (targetForm === 'section-insumos') {
                     secBitacora.classList.add('hidden');
                     secFinanzas.classList.add('hidden');
                     secInsumos.classList.remove('hidden');
+                    secMaquinaria.classList.add('hidden');
+                } else {
+                    secBitacora.classList.add('hidden');
+                    secFinanzas.classList.add('hidden');
+                    secInsumos.classList.add('hidden');
+                    secMaquinaria.classList.remove('hidden');
                 }
             });
         });
@@ -768,6 +849,7 @@ const Components = {
 
                 // If Alimentación, write feeding logs and supply consumption row
                 if (reportCat === 'Alimentación') {
+                    const feedUnit = document.getElementById('report-feed-unit').value;
                     const qtyPerTina = totalQty / selectedTinas.length;
 
                     // Query today's logs to calculate next feeding order
@@ -784,7 +866,7 @@ const Components = {
                             insumo,
                             qtyPerTina,
                             GoogleAPI.user.name,
-                            `Alimentación registrada vía Reporte Diario ${reportId}`
+                            `Alimentación registrada vía Reporte Diario ${reportId} (${feedUnit})`
                         ];
                         nextOrder++;
                         return row;
@@ -801,10 +883,11 @@ const Components = {
                         insumo,
                         'Utilización',
                         totalQty,
-                        'kg',
-                        0
+                        feedUnit,
+                        0,
+                        'Sustrato' // Category is Sustrato
                     ]];
-                    await GoogleAPI.appendSheetData('Insumos!A:H', supplyValues);
+                    await GoogleAPI.appendSheetData('Insumos!A:I', supplyValues);
                 }
 
                 await GoogleAPI.appendSheetData('Reportes!A:F', reportValues);
@@ -896,6 +979,7 @@ const Components = {
 
             try {
                 const supId = `SUP_${Date.now()}`;
+                const supplyCategory = document.getElementById('supply-category').value;
                 const supplyName = document.getElementById('supply-name').value.trim();
                 const supplyQty = parseFloat(document.getElementById('supply-qty').value);
                 const supplyUnit = document.getElementById('supply-unit').value;
@@ -904,13 +988,14 @@ const Components = {
 
                 const supplyValues = [[
                     supId,
-                    'MANUAL', // Independent
+                    'MANUAL',
                     supplyDate,
                     supplyName,
                     supplyAction,
                     supplyQty,
                     supplyUnit,
-                    supplyCost
+                    supplyCost,
+                    supplyCategory
                 ]];
 
                 // If Action is Utilización and N > 0 tinas selected, write feeding logs
@@ -934,7 +1019,7 @@ const Components = {
                             supplyName,
                             qtyPerTina,
                             GoogleAPI.user.name,
-                            `Alimentación manual vía Movimiento de Insumo ${supId}`
+                            `Alimentación manual vía Movimiento de Insumo ${supId} (${supplyUnit})`
                         ];
                         nextOrder++;
                         return row;
@@ -943,7 +1028,7 @@ const Components = {
                     await GoogleAPI.appendFeedingLogsBatch(feedingRows);
                 }
 
-                await GoogleAPI.appendSheetData('Insumos!A:H', supplyValues);
+                await GoogleAPI.appendSheetData('Insumos!A:I', supplyValues);
 
                 // If supply has cost and action is "Adición" (or even "Utilización"), auto-generate a financial record of Gasto
                 if (supplyCost > 0) {
@@ -953,7 +1038,7 @@ const Components = {
                         'MANUAL',
                         supplyDate,
                         'Gasto',
-                        'Alimento / Sustrato',
+                        'Operativo: Compra de Insumos',
                         supplyCost,
                         `Compra auto-registrada de ${supplyQty} ${supplyUnit} de ${supplyName}`
                     ]];
@@ -978,6 +1063,45 @@ const Components = {
                 alert(`Error al registrar insumo: ${err.message}`);
             }
         });
+
+        // FORM SUBMIT 4: MACHINERY
+        const addMachineryForm = document.getElementById('add-machinery-form');
+        if (addMachineryForm) {
+            addMachineryForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (GoogleAPI.user.role === 'Observador') {
+                    alert("Acceso denegado: El rol 'Observador' no puede ingresar datos.");
+                    return;
+                }
+
+                showLoading("Registrando maquinaria/activo...");
+
+                try {
+                    const name = document.getElementById('machinery-name').value.trim();
+                    const date = document.getElementById('machinery-date').value;
+                    const cost = parseFloat(document.getElementById('machinery-cost').value) || 0;
+                    const status = document.getElementById('machinery-status').value;
+                    const desc = document.getElementById('machinery-desc').value.trim();
+
+                    await GoogleAPI.addMaquinaria(name, date, cost, status, desc);
+
+                    hideLoading();
+                    alert("¡Maquinaria/Activo registrado con éxito!");
+
+                    // Reset
+                    addMachineryForm.reset();
+                    document.getElementById('machinery-date').value = todayStr;
+
+                    // Redirect to supplies tab
+                    window.location.hash = '#supplies';
+                } catch (err) {
+                    console.error("Machinery submit error", err);
+                    hideLoading();
+                    const errMsg = err.result?.error?.message || err.message || "Error desconocido";
+                    alert(`Error al registrar maquinaria: ${errMsg}`);
+                }
+            });
+        }
     },
 
     /**
@@ -1204,7 +1328,8 @@ const Components = {
                             let feedIdx;
                             while ((feedIdx = feedingRows.findIndex(row => row[7] && row[7].includes(repId))) !== -1) {
                                 const feedRow = feedingRows[feedIdx];
-                                const feedDetail = `Tina: ${feedRow[1]} | Fecha: ${feedRow[2]} | Insumo: ${feedRow[4]} | Cantidad: ${feedRow[5]}kg | Obs: ${feedRow[7]}`;
+                                const feedUnit = getFeedingUnit(feedRow[7]);
+                                const feedDetail = `Tina: ${feedRow[1]} | Fecha: ${feedRow[2]} | Insumo: ${feedRow[4]} | Cantidad: ${feedRow[5]}${feedUnit} | Obs: ${feedRow[7]}`;
                                 
                                 // Back up feeding deletion
                                 await GoogleAPI.logDeletion('Alimentacion', feedRow[0], feedRow[2], feedDetail, reason);
@@ -1421,25 +1546,33 @@ const Components = {
      */
     async renderSupplies(containerId, showLoading, hideLoading) {
         const container = document.getElementById(containerId);
-        container.innerHTML = `<div class="text-center py-5"><div class="bio-spinner"></div><p>Cargando stock de insumos...</p></div>`;
+        container.innerHTML = `<div class="text-center py-5"><div class="bio-spinner"></div><p>Cargando inventario y activos...</p></div>`;
 
         try {
-            const supplyRows = await GoogleAPI.getSheetData('Insumos!A:H');
-            const supplies = supplyRows.slice(1).filter(row => row[0]); // Filter empty/cleared rows
+            const supplyRows = await GoogleAPI.getSheetData('Insumos!A:I');
+            const machineryRows = await GoogleAPI.getMaquinaria();
+
+            const supplies = supplyRows.slice(1).filter(row => row[0]);
+            const machinery = machineryRows.slice(1).filter(row => row[0]);
 
             // Consolidate inventory stocks
-            const inventory = {};
+            const sustratos = {};
+            const insumosGenerales = {};
+
             supplies.forEach(row => {
                 const name = row[3] ? row[3].trim().toLowerCase() : '';
                 const action = row[4]; // 'Adición' / 'Utilización'
                 const qty = parseFloat(row[5]) || 0;
                 const unit = row[6] || 'kg';
+                const category = row[8] ? row[8].trim() : 'Insumo General';
 
                 if (!name) return;
-                
+
                 const key = name;
-                if (!inventory[key]) {
-                    inventory[key] = {
+                const targetDict = (category === 'Sustrato') ? sustratos : insumosGenerales;
+
+                if (!targetDict[key]) {
+                    targetDict[key] = {
                         name: row[3].trim(),
                         stock: 0,
                         unit: unit,
@@ -1449,72 +1582,203 @@ const Components = {
                 }
 
                 if (action === 'Adición') {
-                    inventory[key].stock += qty;
-                    inventory[key].additions += qty;
+                    targetDict[key].stock += qty;
+                    targetDict[key].additions += qty;
                 } else if (action === 'Utilización') {
-                    inventory[key].stock -= qty;
-                    inventory[key].usages += qty;
+                    targetDict[key].stock -= qty;
+                    targetDict[key].usages += qty;
                 }
             });
 
+            // Calculate total machinery investment
+            let totalInvestment = 0;
+            machinery.forEach(m => {
+                const cost = parseFloat(m[3]) || 0;
+                totalInvestment += cost;
+            });
+
+            // Determine today's local date
+            const now = new Date();
+            const offset = now.getTimezoneOffset();
+            const localNow = new Date(now.getTime() - (offset*60*1000));
+            const todayStr = localNow.toISOString().substring(0, 10);
+
             container.innerHTML = `
                 <div class="slide-in-view">
-                    <!-- Stock alert cards -->
-                    <div class="card">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h3><i class="fa-solid fa-boxes-stacked text-success"></i> Inventario de Insumos Activos</h3>
-                            ${GoogleAPI.user.role !== 'Observador' ? `
-                                <button id="btn-quick-adjust-supply" class="btn btn-primary btn-sm">
-                                    <i class="fa-solid fa-dolly"></i> Movimiento de Stock
-                                </button>
-                            ` : ''}
-                        </div>
-                        
-                        <div class="table-responsive">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Insumo</th>
-                                        <th>Stock Disponible</th>
-                                        <th>Estado</th>
-                                        <th>Total Adiciones (+)</th>
-                                        <th>Total Consumos (-)</th>
-                                        <th>Unidad</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${Object.keys(inventory).length === 0 ? `
-                                        <tr>
-                                            <td colspan="6" class="text-center py-4">No hay insumos registrados en el inventario.</td>
-                                        </tr>
-                                    ` : Object.keys(inventory).map(k => {
-                                        const item = inventory[k];
-                                        let statusBadge = '<span class="badge badge-success">Saludable</span>';
-                                        if (item.stock <= 5) {
-                                            statusBadge = '<span class="badge badge-danger">Crítico</span>';
-                                        } else if (item.stock <= 15) {
-                                            statusBadge = '<span class="badge badge-warning">Bajo</span>';
-                                        }
+                    <!-- Main Tabs -->
+                    <div class="filter-tabs mb-3" id="supplies-main-tabs" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <span class="filter-tab active" data-tab="section-stock" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-boxes-stacked"></i> Insumos y Sustratos</span>
+                        <span class="filter-tab" data-tab="section-machinery" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-screwdriver-wrench"></i> Maquinaria y Equipos</span>
+                    </div>
 
-                                        return `
+                    <div id="supplies-tabs-content">
+                        <!-- TAB 1: CONSUMABLES AND SUBSTRATES -->
+                        <div id="stock-tab-section">
+                            <!-- Sustratos (Alimentación) -->
+                            <div class="card mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h3><i class="fa-solid fa-wheat-awn text-success"></i> 1. Sustratos (Alimentación y Cría)</h3>
+                                    ${GoogleAPI.user.role !== 'Observador' ? `
+                                        <button id="btn-quick-adjust-supply" class="btn btn-primary btn-sm">
+                                            <i class="fa-solid fa-dolly"></i> Movimiento de Stock
+                                        </button>
+                                    ` : ''}
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table">
+                                        <thead>
                                             <tr>
-                                                <td><strong>${item.name}</strong></td>
-                                                <td class="${item.stock <= 5 ? 'text-danger font-weight-bold' : (item.stock <= 15 ? 'text-warning' : 'text-success')}">
-                                                    <strong>${item.stock.toFixed(2)}</strong>
-                                                </td>
-                                                <td>${statusBadge}</td>
-                                                <td>+ ${item.additions.toFixed(1)}</td>
-                                                <td>- ${item.usages.toFixed(1)}</td>
-                                                <td><small>${item.unit}</small></td>
+                                                <th>Sustrato</th>
+                                                <th>Stock Disponible</th>
+                                                <th>Estado</th>
+                                                <th>Total Ingresos (+)</th>
+                                                <th>Total Consumos (-)</th>
+                                                <th>Unidad</th>
                                             </tr>
-                                        `;
-                                    }).join('')}
-                                </tbody>
-                            </table>
+                                        </thead>
+                                        <tbody>
+                                            ${Object.keys(sustratos).length === 0 ? `
+                                                <tr>
+                                                    <td colspan="6" class="text-center py-4 text-secondary">No hay sustratos registrados en el inventario.</td>
+                                                </tr>
+                                            ` : Object.keys(sustratos).map(k => {
+                                                const item = sustratos[k];
+                                                let statusBadge = '<span class="badge badge-success">Saludable</span>';
+                                                if (item.stock <= 5) statusBadge = '<span class="badge badge-danger">Crítico</span>';
+                                                else if (item.stock <= 15) statusBadge = '<span class="badge badge-warning">Bajo</span>';
+                                                
+                                                return `
+                                                    <tr>
+                                                        <td><strong>${item.name}</strong></td>
+                                                        <td class="${item.stock <= 5 ? 'text-danger font-weight-bold' : (item.stock <= 15 ? 'text-warning' : 'text-success')}">
+                                                            <strong>${item.stock.toFixed(2)}</strong>
+                                                        </td>
+                                                        <td>${statusBadge}</td>
+                                                        <td>+ ${item.additions.toFixed(1)}</td>
+                                                        <td>- ${item.usages.toFixed(1)}</td>
+                                                        <td><small>${item.unit}</small></td>
+                                                    </tr>
+                                                `;
+                                            }).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Insumos Generales -->
+                            <div class="card">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h3><i class="fa-solid fa-boxes-stacked text-success"></i> 2. Insumos Generales y Herramientas</h3>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>Insumo</th>
+                                                <th>Stock Disponible</th>
+                                                <th>Estado</th>
+                                                <th>Total Adiciones (+)</th>
+                                                <th>Total Consumos (-)</th>
+                                                <th>Unidad</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${Object.keys(insumosGenerales).length === 0 ? `
+                                                <tr>
+                                                    <td colspan="6" class="text-center py-4 text-secondary">No hay insumos generales registrados.</td>
+                                                </tr>
+                                            ` : Object.keys(insumosGenerales).map(k => {
+                                                const item = insumosGenerales[k];
+                                                let statusBadge = '<span class="badge badge-success">Saludable</span>';
+                                                if (item.stock <= 5) statusBadge = '<span class="badge badge-danger">Crítico</span>';
+                                                else if (item.stock <= 15) statusBadge = '<span class="badge badge-warning">Bajo</span>';
+                                                
+                                                return `
+                                                    <tr>
+                                                        <td><strong>${item.name}</strong></td>
+                                                        <td class="${item.stock <= 5 ? 'text-danger font-weight-bold' : (item.stock <= 15 ? 'text-warning' : 'text-success')}">
+                                                            <strong>${item.stock.toFixed(2)}</strong>
+                                                        </td>
+                                                        <td>${statusBadge}</td>
+                                                        <td>+ ${item.additions.toFixed(1)}</td>
+                                                        <td>- ${item.usages.toFixed(1)}</td>
+                                                        <td><small>${item.unit}</small></td>
+                                                    </tr>
+                                                `;
+                                            }).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TAB 2: MACHINERY AND ASSETS -->
+                        <div id="machinery-tab-section" class="hidden">
+                            <div class="card p-3 mb-4" style="background-color: var(--bg-secondary); border-left: 4px solid var(--brand-primary); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                                <div>
+                                    <small class="text-secondary" style="text-transform: uppercase; font-size: 0.75rem;">Inversión Total en Activos</small>
+                                    <h2 class="text-success mt-1" style="font-family: 'Outfit', sans-serif;">$${totalInvestment.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h2>
+                                </div>
+                                <a href="#add-report" class="btn btn-outline btn-sm ${GoogleAPI.user.role === 'Observador' ? 'hidden' : ''}">
+                                    <i class="fa-solid fa-plus"></i> Registrar Nueva Maquinaria
+                                </a>
+                            </div>
+
+                            <div class="card">
+                                <h3 class="mb-4"><i class="fa-solid fa-screwdriver-wrench text-success"></i> Listado de Maquinaria y Equipos</h3>
+                                
+                                ${machinery.length === 0 ? `
+                                    <div class="text-center py-5 text-secondary">
+                                        <i class="fa-solid fa-industry mb-3" style="font-size: 3rem;"></i>
+                                        <p>No hay maquinaria o equipos registrados en el sistema.</p>
+                                        <p style="font-size: 0.85rem;" class="mt-1">Puedes darlos de alta desde la sección "Nuevo Reporte -> Registrar Maquinaria".</p>
+                                    </div>
+                                ` : `
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem;" id="machinery-grid-container">
+                                        ${machinery.map(m => {
+                                            const id = m[0];
+                                            const name = m[1];
+                                            const date = m[2];
+                                            const cost = parseFloat(m[3]) || 0;
+                                            const status = m[4];
+                                            const desc = m[5] || '';
+
+                                            let statusClass = 'disponible';
+                                            if (status === 'En Mantenimiento') statusClass = 'neonatos';
+                                            else if (status === 'Fuera de servicio') statusClass = 'prepupa';
+
+                                            return `
+                                                <div class="cama-card" data-id="${id}" style="padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; min-height: 180px; gap: 0.75rem;">
+                                                    <div>
+                                                        <div class="d-flex justify-content-between align-items-start">
+                                                            <h4 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.1rem; color: var(--text-primary); font-weight: bold;">${name}</h4>
+                                                            <span class="cama-badge ${statusClass}">${status}</span>
+                                                        </div>
+                                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;" class="mb-0">
+                                                            Adquisición: <strong>${date}</strong><br>
+                                                            Inversión: <strong class="text-success">$${cost.toFixed(2)}</strong>
+                                                        </p>
+                                                        ${desc ? `<p style="font-size: 0.8rem; color: var(--text-warning); font-style: italic; margin-top: 0.5rem; line-height: 1.25;" class="mb-0"><i class="fa-solid fa-info-circle"></i> ${desc}</p>` : ''}
+                                                    </div>
+
+                                                    <div style="margin-top: auto; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.5rem;">
+                                                        <label style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0; white-space: nowrap;">Estado:</label>
+                                                        <select class="form-control select-machinery-status" data-id="${id}" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; height: auto;" ${GoogleAPI.user.role === 'Observador' ? 'disabled' : ''}>
+                                                            <option value="Operativo" ${status === 'Operativo' ? 'selected' : ''}>Operativo</option>
+                                                            <option value="En Mantenimiento" ${status === 'En Mantenimiento' ? 'selected' : ''}>En Mantenimiento</option>
+                                                            <option value="Fuera de servicio" ${status === 'Fuera de servicio' ? 'selected' : ''}>Fuera de servicio</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                `}
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Supply movement modal overlay (hidden by default) -->
+                    <!-- Supply movement modal overlay -->
                     <div id="supply-adjust-modal" class="modal-overlay hidden">
                         <div class="modal-card">
                             <div class="modal-header" style="background-color: var(--brand-primary); color: #090d16;">
@@ -1523,6 +1787,13 @@ const Components = {
                             </div>
                             <div class="modal-body">
                                 <form id="quick-supply-form">
+                                    <div class="form-group">
+                                        <label class="form-label" for="m-supply-category">Categoría</label>
+                                        <select id="m-supply-category" class="form-control" required>
+                                            <option value="Sustrato">Sustrato</option>
+                                            <option value="Insumo General">Insumo General</option>
+                                        </select>
+                                    </div>
                                     <div class="form-group">
                                         <label class="form-label" for="m-supply-name">Insumo</label>
                                         <input type="text" id="m-supply-name" class="form-control" placeholder="Ej: Salvado de Trigo" required>
@@ -1543,6 +1814,8 @@ const Components = {
                                             <label class="form-label" for="m-supply-unit">Unidad</label>
                                             <select id="m-supply-unit" class="form-control">
                                                 <option value="kg">kg</option>
+                                                <option value="baldes">baldes</option>
+                                                <option value="sacos">sacos</option>
                                                 <option value="L">Litros (L)</option>
                                                 <option value="unidades">Unidades</option>
                                                 <option value="g">gramos (g)</option>
@@ -1559,6 +1832,46 @@ const Components = {
                     </div>
                 </div>
             `;
+
+            // Tab switching logic
+            const tabStock = document.getElementById('stock-tab-section');
+            const tabMachinery = document.getElementById('machinery-tab-section');
+            const mainTabs = document.querySelectorAll('#supplies-main-tabs .filter-tab');
+
+            mainTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    mainTabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+
+                    const selectedTab = tab.getAttribute('data-tab');
+                    if (selectedTab === 'section-stock') {
+                        tabStock.classList.remove('hidden');
+                        tabMachinery.classList.add('hidden');
+                    } else {
+                        tabStock.classList.add('hidden');
+                        tabMachinery.classList.remove('hidden');
+                    }
+                });
+            });
+
+            // Machinery Status Change listener
+            document.querySelectorAll('.select-machinery-status').forEach(select => {
+                select.addEventListener('change', async (e) => {
+                    const id = e.target.getAttribute('data-id');
+                    const newStatus = e.target.value;
+                    showLoading("Actualizando estado de maquinaria...");
+                    try {
+                        await GoogleAPI.updateMaquinariaStatus(id, newStatus);
+                        hideLoading();
+                        alert("Estado de maquinaria actualizado.");
+                        this.renderSupplies(containerId, showLoading, hideLoading); // Re-render
+                    } catch (err) {
+                        console.error(err);
+                        hideLoading();
+                        alert(`Error al actualizar estado: ${err.message}`);
+                    }
+                });
+            });
 
             // Modal logic wiring
             if (GoogleAPI.user.role !== 'Observador') {
@@ -1579,6 +1892,7 @@ const Components = {
                         const localNow = new Date(now.getTime() - (offset*60*1000));
                         const formattedDate = localNow.toISOString().substring(0, 10);
 
+                        const mCategory = document.getElementById('m-supply-category').value;
                         const mName = document.getElementById('m-supply-name').value.trim();
                         const mAction = document.getElementById('m-supply-action').value;
                         const mQty = parseFloat(document.getElementById('m-supply-qty').value);
@@ -1586,16 +1900,17 @@ const Components = {
 
                         const rowValues = [[
                             `SUP_${Date.now()}`,
-                            'MANUAL', // No associated report
+                            'MANUAL',
                             formattedDate,
                             mName,
                             mAction,
                             mQty,
                             mUnit,
-                            0 // Cost total 0 for manual quick adjustments
+                            0,
+                            mCategory
                         ]];
 
-                        await GoogleAPI.appendSheetData('Insumos!A:H', rowValues);
+                        await GoogleAPI.appendSheetData('Insumos!A:I', rowValues);
                         modal.classList.add('hidden');
                         hideLoading();
                         alert("Movimiento de inventario guardado.");
@@ -1911,6 +2226,7 @@ const Components = {
                                         const camaId = row[1];
                                         const details = camas.find(c => c[0] === camaId) || [camaId, camaId];
                                         const name = details[1].replace('Cama', 'Tina');
+                                        const feedUnit = getFeedingUnit(row[7]);
                                         return `
                                             <tr>
                                                 <td><strong>${row[2]}</strong></td>
@@ -1921,7 +2237,7 @@ const Components = {
                                                     </span>
                                                 </td>
                                                 <td>${row[4]}</td>
-                                                <td><strong>${parseFloat(row[5]).toFixed(2)} kg</strong></td>
+                                                <td><strong>${parseFloat(row[5]).toFixed(2)} ${feedUnit}</strong></td>
                                                 <td><small>${row[6]}</small></td>
                                                 <td><span class="text-secondary" style="font-size: 0.85rem;">${row[7] || '-'}</span></td>
                                             </tr>
@@ -1970,15 +2286,18 @@ const Components = {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${sortedLogs.map(row => `
-                                        <tr>
-                                            <td><strong>${row[2]}</strong></td>
-                                            <td>${row[4]}</td>
-                                            <td><strong>${parseFloat(row[5]).toFixed(2)} kg</strong></td>
-                                            <td><small>${row[6]}</small></td>
-                                            <td><span class="text-secondary" style="font-size: 0.85rem;">${row[7] || '-'}</span></td>
-                                        </tr>
-                                    `).join('')}
+                                    ${sortedLogs.map(row => {
+                                        const feedUnit = getFeedingUnit(row[7]);
+                                        return `
+                                            <tr>
+                                                <td><strong>${row[2]}</strong></td>
+                                                <td>${row[4]}</td>
+                                                <td><strong>${parseFloat(row[5]).toFixed(2)} ${feedUnit}</strong></td>
+                                                <td><small>${row[6]}</small></td>
+                                                <td><span class="text-secondary" style="font-size: 0.85rem;">${row[7] || '-'}</span></td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
                                 </tbody>
                             </table>
                         </div>
@@ -2879,12 +3198,13 @@ const Components = {
                                 <div class="tina-timeline" style="display: flex; flex-direction: column; gap: 1rem; border-left: 2px solid var(--border-color); padding-left: 1.25rem; margin-left: 0.5rem;">
                                     ${timeline.map(item => {
                                         if (item.type === 'feeding') {
+                                            const feedUnit = getFeedingUnit(item.obs);
                                             return `
                                                 <div class="timeline-event" style="position: relative;">
                                                     <span style="position: absolute; left: -1.7rem; top: 0.15rem; background: var(--brand-primary); color: #090d16; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.5rem;"><i class="fa-solid fa-seedling"></i></span>
                                                     <div style="font-size: 0.8rem; color: var(--text-secondary);">${item.date}</div>
                                                     <div style="font-size: 0.9rem; font-weight: 600; margin-top: 0.15rem;">Alimentación (${item.order}º)</div>
-                                                    <div style="font-size: 0.85rem; margin-top: 0.1rem;">Se suministró <strong>${item.qty.toFixed(2)} kg</strong> de <strong>${item.insumo}</strong> por <small class="text-secondary">${item.user}</small>.</div>
+                                                    <div style="font-size: 0.85rem; margin-top: 0.1rem;">Se suministró <strong>${item.qty.toFixed(2)} ${feedUnit}</strong> de <strong>${item.insumo}</strong> por <small class="text-secondary">${item.user}</small>.</div>
                                                     ${item.obs ? `<div style="font-size: 0.8rem; color: var(--text-warning); font-style: italic; margin-top: 0.15rem; background: rgba(234,179,8,0.1); padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); border-left: 2px solid var(--text-warning);">${item.obs}</div>` : ''}
                                                 </div>
                                             `;

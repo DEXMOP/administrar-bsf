@@ -213,7 +213,7 @@ const GoogleAPI = {
             });
             
             const existingSheets = spreadsheet.result.sheets.map(s => s.properties.title);
-            const requiredSheets = ['Usuarios', 'Reportes', 'Finanzas', 'Insumos', 'Camas', 'Registro_Alimentacion', 'Registro_Etapas', 'Registro_Eliminados'];
+            const requiredSheets = ['Usuarios', 'Reportes', 'Finanzas', 'Insumos', 'Camas', 'Registro_Alimentacion', 'Registro_Etapas', 'Registro_Eliminados', 'Maquinaria'];
             const sheetsToCreate = requiredSheets.filter(name => !existingSheets.includes(name));
 
             // 2. Create missing sheets and initialize headers
@@ -234,11 +234,12 @@ const GoogleAPI = {
                     if (sheetName === 'Usuarios') headers = [['Email', 'Nombre', 'Rol']];
                     else if (sheetName === 'Reportes') headers = [['ID_Reporte', 'Fecha_Hora', 'Descripcion', 'Fotos_IDs', 'Categoria', 'Usuario']];
                     else if (sheetName === 'Finanzas') headers = [['ID_Transaccion', 'ID_Reporte', 'Fecha', 'Tipo', 'Categoria', 'Monto', 'Descripcion']];
-                    else if (sheetName === 'Insumos') headers = [['ID_Movimiento', 'ID_Reporte', 'Fecha', 'Insumo', 'Accion', 'Cantidad', 'Unidad', 'Costo_Total']];
+                    else if (sheetName === 'Insumos') headers = [['ID_Movimiento', 'ID_Reporte', 'Fecha', 'Insumo', 'Accion', 'Cantidad', 'Unidad', 'Costo_Total', 'Categoria']];
                     else if (sheetName === 'Camas') headers = [['ID_Cama', 'Nombre', 'Tipo_Tamano', 'Estado', 'Grupo']];
                     else if (sheetName === 'Registro_Alimentacion') headers = [['ID_Alimentacion', 'ID_Cama', 'Fecha_Hora', 'Orden', 'Insumo', 'Cantidad', 'Usuario', 'Observaciones']];
                     else if (sheetName === 'Registro_Etapas') headers = [['ID_Cambio', 'ID_Tina', 'Fecha_Hora', 'Etapa_Anterior', 'Etapa_Nueva', 'Observacion', 'Usuario']];
                     else if (sheetName === 'Registro_Eliminados') headers = [['ID_Eliminacion', 'Tipo_Registro', 'ID_Original', 'Fecha_Hora_Original', 'Contenido_Original', 'Fecha_Hora_Eliminacion', 'Usuario', 'Motivo']];
+                    else if (sheetName === 'Maquinaria') headers = [['ID_Equipo', 'Nombre', 'Fecha_Adquisicion', 'Costo', 'Estado', 'Descripcion']];
 
                     await gapi.client.sheets.spreadsheets.values.update({
                         spreadsheetId: this.config.spreadsheetId,
@@ -254,14 +255,15 @@ const GoogleAPI = {
                 { name: 'Camas', expected: ['ID_Cama', 'Nombre', 'Tipo_Tamano', 'Estado', 'Grupo'] },
                 { name: 'Registro_Alimentacion', expected: ['ID_Alimentacion', 'ID_Cama', 'Fecha_Hora', 'Orden', 'Insumo', 'Cantidad', 'Usuario', 'Observaciones'] },
                 { name: 'Registro_Etapas', expected: ['ID_Cambio', 'ID_Tina', 'Fecha_Hora', 'Etapa_Anterior', 'Etapa_Nueva', 'Observacion', 'Usuario'] },
-                { name: 'Registro_Eliminados', expected: ['ID_Eliminacion', 'Tipo_Registro', 'ID_Original', 'Fecha_Hora_Original', 'Contenido_Original', 'Fecha_Hora_Eliminacion', 'Usuario', 'Motivo'] }
+                { name: 'Registro_Eliminados', expected: ['ID_Eliminacion', 'Tipo_Registro', 'ID_Original', 'Fecha_Hora_Original', 'Contenido_Original', 'Fecha_Hora_Eliminacion', 'Usuario', 'Motivo'] },
+                { name: 'Insumos', expected: ['ID_Movimiento', 'ID_Reporte', 'Fecha', 'Insumo', 'Accion', 'Cantidad', 'Unidad', 'Costo_Total', 'Categoria'] }
             ];
 
             for (const item of sheetsToCheck) {
                 try {
                     const res = await gapi.client.sheets.spreadsheets.values.get({
                         spreadsheetId: this.config.spreadsheetId,
-                        range: `${item.name}!A1:H1`
+                        range: `${item.name}!A1:I1`
                     });
                     const currentHeaders = res.result.values ? res.result.values[0] : [];
                     
@@ -666,7 +668,8 @@ const GoogleAPI = {
             'Reportes!A2:F10000',
             'Finanzas!A2:G10000',
             'Insumos!A2:H10000',
-            'Registro_Eliminados!A2:H10000'
+            'Registro_Eliminados!A2:H10000',
+            'Maquinaria!A2:F10000'
         ];
         
         const promises = sheetsToClear.map(range => this.clearSheetRange(range));
@@ -738,5 +741,60 @@ const GoogleAPI = {
         });
         
         await this.appendSheetData('Registro_Etapas!A:G', logRows);
+    },
+
+    /**
+     * Get all Machinery
+     */
+    async getMaquinaria() {
+        return await this.getSheetData('Maquinaria!A:F');
+    },
+
+    /**
+     * Add new machinery and log optional automatic finance expense
+     */
+    async addMaquinaria(nombre, fecha, costo, estado, desc) {
+        const idEquipo = `EQP-${Date.now()}`;
+        const row = [
+            idEquipo,
+            nombre,
+            fecha,
+            costo.toString(),
+            estado,
+            desc || ''
+        ];
+        
+        await this.appendSheetData('Maquinaria!A:F', [row]);
+        
+        // Auto-log expense if cost > 0
+        const parsedCost = parseFloat(costo) || 0;
+        if (parsedCost > 0) {
+            const txRow = [
+                `TX_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+                'MANUAL',
+                fecha,
+                'Gasto',
+                'Activos: Compra de Maquinaria',
+                parsedCost.toString(),
+                `Compra de activo: ${nombre}`
+            ];
+            await this.appendSheetData('Finanzas!A:G', [txRow]);
+        }
+        
+        return idEquipo;
+    },
+
+    /**
+     * Update machinery status
+     */
+    async updateMaquinariaStatus(equipoId, nuevoEstado) {
+        const machinery = await this.getMaquinaria();
+        const idx = machinery.findIndex(m => m[0] === equipoId);
+        if (idx === -1) {
+            throw new Error(`Equipo ${equipoId} no encontrado en la base de datos.`);
+        }
+        const rowNum = idx + 1;
+        await this.updateSheetRow(`Maquinaria!E${rowNum}:E${rowNum}`, [[nuevoEstado]]);
     }
 };
+
