@@ -231,15 +231,17 @@ const Components = {
             const camasRows = await GoogleAPI.getSheetData('Camas!A:D');
             const feedingRows = await GoogleAPI.getSheetData('Registro_Alimentacion!A:I');
 
-            // Skip headers in processing
-            const finances = financeRows.slice(1);
-            const supplies = supplyRows.slice(1);
-            const reports = reportRows.slice(1);
+            // Skip headers in processing and filter out empty rows
+            const finances = financeRows.slice(1).filter(row => row && row[0] && row[0].trim() !== "");
+            const supplies = supplyRows.slice(1).filter(row => row && row[0] && row[0].trim() !== "");
+            const reports = reportRows.slice(1).filter(row => row && row[0] && row[0].trim() !== "");
 
             // Calculations
             let totalIncome = 0;
             let totalExpenses = 0;
             finances.forEach(row => {
+                const isDeleted = row[0] && row[0].startsWith('ELIMINADO_');
+                if (isDeleted) return;
                 const type = row[3]; // 'Ingreso' / 'Gasto'
                 const amount = parseFloat(row[5]) || 0;
                 if (type === 'Ingreso') totalIncome += amount;
@@ -2232,10 +2234,12 @@ const Components = {
             const reportRows = await GoogleAPI.getSheetData('Reportes!A:G');
             const financeRows = await GoogleAPI.getSheetData('Finanzas!A:G');
             const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
+            const feedingRows = await GoogleAPI.getSheetData('Registro_Alimentacion!A:I');
 
-            const reports = reportRows.slice(1);
-            const finances = financeRows.slice(1);
-            const supplies = supplyRows.slice(1);
+            const reports = reportRows.slice(1).filter(row => row && row[0] && row[0].trim() !== "");
+            const finances = financeRows.slice(1).filter(row => row && row[0] && row[0].trim() !== "");
+            const supplies = supplyRows.slice(1).filter(row => row && row[0] && row[0].trim() !== "");
+            const feedings = feedingRows.slice(1).filter(row => row && row[0] && row[0].trim() !== "");
 
             if (reports.length === 0) {
                 container.innerHTML = `
@@ -2262,6 +2266,17 @@ const Components = {
                 if (repId) supplyMap[repId] = row;
             });
 
+            const feedingMap = {};
+            feedings.forEach(row => {
+                const obs = row[7] || '';
+                const match = obs.match(/REP_\d+/);
+                if (match) {
+                    const repId = match[0];
+                    if (!feedingMap[repId]) feedingMap[repId] = [];
+                    feedingMap[repId].push(row);
+                }
+            });
+
             // Sort reports chronologically desc (newest first)
             reports.sort((a, b) => new Date(b[1]) - new Date(a[1]));
 
@@ -2278,6 +2293,7 @@ const Components = {
 
                         const relatedFinance = financeMap[id];
                         const relatedSupply = supplyMap[id];
+                        const relatedFeedings = feedingMap[id] || [];
 
                         return `
                             <div class="card timeline-card" id="timeline-card-${id}">
@@ -2313,7 +2329,7 @@ const Components = {
                                     </div>
                                 ` : ''}
 
-                                ${(relatedFinance || relatedSupply) ? `
+                                ${(relatedFinance || relatedSupply || relatedFeedings.length > 0) ? `
                                     <div class="timeline-extra">
                                         ${relatedFinance ? `
                                             <div class="timeline-extra-item">
@@ -2325,6 +2341,12 @@ const Components = {
                                             <div class="timeline-extra-item">
                                                 <i class="fa-solid fa-boxes-stacked text-warning"></i>
                                                 <span>${relatedSupply[4]} Insumo: <strong>${relatedSupply[3]}</strong> (${parseFloat(relatedSupply[5])} ${relatedSupply[6]}${relatedSupply[9] ? ` - Presentación: ${relatedSupply[9]}` : ''})</span>
+                                            </div>
+                                        ` : ''}
+                                        ${relatedFeedings.length > 0 ? `
+                                            <div class="timeline-extra-item">
+                                                <i class="fa-solid fa-utensils text-info"></i>
+                                                <span>Alimentación: Tina(s) <strong>${relatedFeedings.map(f => f[1]).join(', ')}</strong> alimentada(s) con un total de <strong>${relatedFeedings.reduce((sum, f) => sum + (parseFloat(f[5]) || 0), 0).toFixed(2)}</strong> ${relatedFeedings[0][7] && relatedFeedings[0][7].match(/\(([^)]+)\)/)?.[1] ? relatedFeedings[0][7].match(/\(([^)]+)\)/)[1] : 'unidades'} de <strong>${relatedFeedings[0][4]}</strong>.</span>
                                             </div>
                                         ` : ''}
                                     </div>
@@ -2540,17 +2562,66 @@ const Components = {
 
         try {
             const financeRows = await GoogleAPI.getSheetData('Finanzas!A:G');
-            const finances = financeRows.slice(1).filter(row => row[0]); // Filter empty/cleared rows
+            const finances = financeRows.slice(1).filter(row => row && row[0] && row[0].trim() !== "");
+
+            const showDeleted = this.showDeletedFinances || false;
 
             let totalIncome = 0;
             let totalExpenses = 0;
             finances.forEach(row => {
+                const isDeleted = row[0] && row[0].startsWith('ELIMINADO_');
+                if (isDeleted) return;
+                
                 const type = row[3];
                 const val = parseFloat(row[5]) || 0;
                 if (type === 'Ingreso') totalIncome += val;
                 else if (type === 'Gasto') totalExpenses += val;
             });
             const balance = totalIncome - totalExpenses;
+
+            const getRegistrationDateTime = (txId, fallbackDate) => {
+                if (txId) {
+                    const cleanId = txId.startsWith('ELIMINADO_') ? txId.replace('ELIMINADO_', '') : txId;
+                    if (cleanId.startsWith('TX_')) {
+                        const parts = cleanId.split('_');
+                        if (parts[1]) {
+                            const ms = parseInt(parts[1]);
+                            if (!isNaN(ms)) {
+                                const dateObj = new Date(ms);
+                                const offset = dateObj.getTimezoneOffset();
+                                const localDateObj = new Date(dateObj.getTime() - (offset * 60 * 1000));
+                                return localDateObj.toISOString().replace('T', ' ').substring(0, 19);
+                            }
+                        }
+                    }
+                }
+                return fallbackDate || 'Desconocida';
+            };
+
+            // Sorting: Newest transaction date first (row[2]), secondary sort on creation timestamp (txId)
+            finances.sort((a, b) => {
+                const dateA = new Date(a[2]);
+                const dateB = new Date(b[2]);
+                if (dateB - dateA !== 0) {
+                    return dateB - dateA;
+                }
+                const getIdTime = (txId) => {
+                    const cleanId = txId.startsWith('ELIMINADO_') ? txId.replace('ELIMINADO_', '') : txId;
+                    if (cleanId.startsWith('TX_')) {
+                        const parts = cleanId.split('_');
+                        if (parts[1]) return parseInt(parts[1]) || 0;
+                    }
+                    return 0;
+                };
+                return getIdTime(b[0]) - getIdTime(a[0]);
+            });
+
+            // Filter display based on showDeleted toggle
+            const visibleFinances = finances.filter(row => {
+                const isDeleted = row[0] && row[0].startsWith('ELIMINADO_');
+                if (isDeleted && !showDeleted) return false;
+                return true;
+            });
 
             container.innerHTML = `
                 <div class="slide-in-view">
@@ -2581,40 +2652,134 @@ const Components = {
 
                     <!-- Ledger Table -->
                     <div class="card mt-3">
-                        <h3 class="mb-3"><i class="fa-solid fa-list-check text-success"></i> Registro Contable Detallado</h3>
+                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                            <h3><i class="fa-solid fa-list-check text-success"></i> Registro Contable Detallado</h3>
+                            <button id="btn-toggle-deleted-finances" class="btn ${showDeleted ? 'btn-primary' : 'btn-outline'} btn-sm">
+                                <i class="fa-solid ${showDeleted ? 'fa-eye-slash' : 'fa-eye'}"></i> 
+                                ${showDeleted ? 'Ocultar Eliminados' : 'Mostrar Eliminados (Transparencia)'}
+                            </button>
+                        </div>
                         <div class="table-responsive">
                             <table class="table">
                                 <thead>
                                     <tr>
-                                        <th>Fecha</th>
+                                        <th>Fecha Mov.</th>
                                         <th>Tipo</th>
                                         <th>Categoría</th>
                                         <th>Monto ($)</th>
                                         <th>Detalle / Descripción</th>
                                         <th>Reporte Asoc.</th>
+                                        <th>Fecha Registro</th>
+                                        <th>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${finances.length === 0 ? `
+                                    ${visibleFinances.length === 0 ? `
                                         <tr>
-                                            <td colspan="6" class="text-center py-4">No se han registrado transacciones financieras aún.</td>
+                                            <td colspan="8" class="text-center py-4">No se han registrado transacciones financieras aún.</td>
                                         </tr>
-                                    ` : finances.map(row => `
-                                        <tr>
-                                            <td><strong>${row[2]}</strong></td>
-                                            <td><span class="badge ${row[3] === 'Ingreso' ? 'badge-success' : 'badge-danger'}">${row[3]}</span></td>
-                                            <td>${row[4]}</td>
-                                            <td class="${row[3] === 'Ingreso' ? 'text-success' : 'text-danger'}"><strong>$${parseFloat(row[5]).toFixed(2)}</strong></td>
-                                            <td>${row[6]}</td>
-                                            <td><small class="text-secondary">${row[1] && row[1].startsWith('REP_') ? `<a href="#reports-list" style="color: var(--brand-primary); font-weight: bold; text-decoration: underline;"><i class="fa-solid fa-file-lines"></i> Ver Reporte</a>` : (row[1] || 'Manual')}</small></td>
-                                        </tr>
-                                    `).join('')}
+                                    ` : visibleFinances.map(row => {
+                                        const isDeleted = row[0] && row[0].startsWith('ELIMINADO_');
+                                        const cleanId = isDeleted ? row[0].replace('ELIMINADO_', '') : row[0];
+                                        const regDate = getRegistrationDateTime(row[0], row[2]);
+                                        
+                                        const rowStyle = isDeleted ? 'style="color: var(--text-secondary); opacity: 0.6; text-decoration: line-through;"' : '';
+                                        
+                                        return `
+                                            <tr ${rowStyle}>
+                                                <td><strong>${row[2]}</strong></td>
+                                                <td>
+                                                    ${isDeleted ? `
+                                                        <span class="badge badge-secondary" style="text-decoration: line-through;">ELIMINADO</span>
+                                                    ` : `
+                                                        <span class="badge ${row[3] === 'Ingreso' ? 'badge-success' : 'badge-danger'}">${row[3]}</span>
+                                                    `}
+                                                </td>
+                                                <td>${row[4]}</td>
+                                                <td class="${isDeleted ? '' : (row[3] === 'Ingreso' ? 'text-success' : 'text-danger')}">
+                                                    <strong>$${parseFloat(row[5]).toFixed(2)}</strong>
+                                                </td>
+                                                <td>${row[6]}</td>
+                                                <td>
+                                                    <small class="text-secondary">
+                                                        ${row[1] && row[1].startsWith('REP_') ? `
+                                                            <a href="#reports-list" style="color: var(--brand-primary); font-weight: bold; text-decoration: underline;">
+                                                                <i class="fa-solid fa-file-lines"></i> Ver Reporte
+                                                            </a>
+                                                        ` : (row[1] || 'Manual')}
+                                                    </small>
+                                                </td>
+                                                <td><small class="text-secondary">${regDate}</small></td>
+                                                <td>
+                                                    ${(!isDeleted && (GoogleAPI.user.role === 'Socio' || GoogleAPI.user.role === 'Administrador')) ? `
+                                                        <button class="btn-icon-only text-danger btn-delete-finance" data-id="${row[0]}" title="Eliminar registro">
+                                                            <i class="fa-solid fa-trash"></i>
+                                                        </button>
+                                                    ` : ''}
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
             `;
+
+            // Wire toggle button
+            const toggleBtn = container.querySelector('#btn-toggle-deleted-finances');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', () => {
+                    this.showDeletedFinances = !showDeleted;
+                    this.renderFinances(containerId, showLoading, hideLoading);
+                });
+            }
+
+            // Wire delete buttons
+            const deleteButtons = container.querySelectorAll('.btn-delete-finance');
+            deleteButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const txId = btn.getAttribute('data-id');
+                    
+                    this.showDeleteReasonModal(async (reason) => {
+                        showLoading("Respaldando y anulando transacción contable...");
+                        try {
+                            const financeRows = await GoogleAPI.getSheetData('Finanzas!A:G');
+                            
+                            const txIdx = financeRows.findIndex(row => row[0] === txId);
+                            if (txIdx === -1) {
+                                throw new Error("No se encontró la transacción en la base de datos.");
+                            }
+                            
+                            const txRow = financeRows[txIdx];
+                            const txDetail = `Fecha: ${txRow[2]} | Tipo: ${txRow[3]} | Categoria: ${txRow[4]} | Monto: $${txRow[5]} | Descripcion: ${txRow[6]}`;
+                            
+                            await GoogleAPI.logDeletion('Finanzas', txId, txRow[2], txDetail, reason);
+                            
+                            const updatedRow = [...txRow];
+                            updatedRow[0] = `ELIMINADO_${txId}`;
+                            updatedRow[6] = `${txRow[6] || ''} [ELIMINADO por ${GoogleAPI.user.name} el ${new Date().toLocaleString()} - Motivo: ${reason}]`;
+                            
+                            await GoogleAPI.updateSheetRow(`Finanzas!A${txIdx + 1}:G${txIdx + 1}`, [updatedRow]);
+                            
+                            GoogleAPI.invalidateCacheForSheet('Finanzas');
+                            
+                            hideLoading();
+                            alert("Transacción contable anulada con éxito para transparencia. El registro de auditoría fue guardado.");
+                            
+                            this.renderFinances(containerId, showLoading, hideLoading);
+                        } catch (err) {
+                            console.error(err);
+                            hideLoading();
+                            alert(`Error al intentar anular la transacción: ${err.message}`);
+                        }
+                    }, () => {
+                        // Cancel - do nothing
+                    });
+                });
+            });
+
         } catch (err) {
             console.error("Finances render error", err);
             container.innerHTML = `<div class="card p-5 text-center"><p class="text-danger">Error al cargar contabilidad: ${err.message}</p></div>`;

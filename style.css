@@ -1684,4 +1684,25 @@ textarea.form-control {
     color: #166534 !important;
 }
 
+/* Flexbox and alignment utilities */
+.d-flex {
+    display: flex !important;
+}
+.justify-content-between {
+    justify-content: space-between !important;
+}
+.justify-content-end {
+    justify-content: flex-end !important;
+}
+.align-items-center {
+    align-items: center !important;
+}
+.flex-wrap {
+    flex-wrap: wrap !important;
+}
+.gap-2 {
+    gap: 0.5rem !important;
+}
+
+
 
