@@ -255,7 +255,8 @@ const App = {
         const page = hash.replace('#', '');
         
         // Check authentication guard
-        if (!GoogleAPI.accessToken && page !== 'login') {
+        const isAuthenticated = GoogleAPI.accessToken || GoogleAPI.idToken;
+        if (!isAuthenticated && page !== 'login') {
             window.location.hash = '#login';
             return;
         }
