@@ -108,14 +108,21 @@ const GoogleAPI = {
             });
 
             // Render Google Sign-in button over login placeholder if Apps Script is configured
+            // Render Google Sign-in button if Apps Script is configured
+            const gsiContainer = document.getElementById("gsi-button-container");
+            const btnLogin = document.getElementById("btn-login");
             if (this.config && this.config.appsScriptUrl) {
-                const btn = document.getElementById("btn-login");
-                if (btn) {
+                if (gsiContainer) {
+                    gsiContainer.classList.remove("hidden");
+                    if (btnLogin) btnLogin.classList.add("hidden");
                     google.accounts.id.renderButton(
-                        btn,
+                        gsiContainer,
                         { theme: "filled_blue", size: "large", width: 320 }
                     );
                 }
+            } else {
+                if (gsiContainer) gsiContainer.classList.add("hidden");
+                if (btnLogin) btnLogin.classList.remove("hidden");
             }
         } catch (err) {
             console.error("GSI Credential Client init error", err);
@@ -185,11 +192,14 @@ const GoogleAPI = {
                         onStatusChange('logging-in');
                         this.initializeDatabase(onStatusChange, onError);
                         
-                        // Render Google Sign-in button over login placeholder if visible
-                        const btn = document.getElementById("btn-login");
-                        if (btn) {
+                        // Render Google Sign-in button inside GSI container if visible
+                        const gsiContainer = document.getElementById("gsi-button-container");
+                        const btnLogin = document.getElementById("btn-login");
+                        if (gsiContainer) {
+                            gsiContainer.classList.remove("hidden");
+                            if (btnLogin) btnLogin.classList.add("hidden");
                             google.accounts.id.renderButton(
-                                btn,
+                                gsiContainer,
                                 { theme: "filled_blue", size: "large", width: 280 }
                             );
                         }
@@ -203,11 +213,14 @@ const GoogleAPI = {
                 localStorage.removeItem('bsf_token_expiry');
                 onStatusChange('logged-out');
                 
-                // Render Google button directly over login placeholder
-                const btn = document.getElementById("btn-login");
-                if (btn) {
+                // Render Google button inside GSI container
+                const gsiContainer = document.getElementById("gsi-button-container");
+                const btnLogin = document.getElementById("btn-login");
+                if (gsiContainer) {
+                    gsiContainer.classList.remove("hidden");
+                    if (btnLogin) btnLogin.classList.add("hidden");
                     google.accounts.id.renderButton(
-                        btn,
+                        gsiContainer,
                         { theme: "filled_blue", size: "large", width: 320 }
                     );
                 }
