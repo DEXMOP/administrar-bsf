@@ -13,6 +13,30 @@ const GoogleAPI = {
     gsiInitialized: false,
     accessToken: null,
     
+    // Client-side cache
+    clientCache: {},
+    cacheExpiryMs: 60000, // 60 seconds (1 minute)
+
+    getSheetNameFromRange(range) {
+        if (!range) return '';
+        const parts = range.split('!');
+        return parts[0].replace(/['"]/g, '');
+    },
+
+    invalidateCacheForSheet(sheetName) {
+        if (!sheetName) return;
+        const normalized = sheetName.toLowerCase();
+        for (const key in this.clientCache) {
+            if (this.getSheetNameFromRange(key).toLowerCase() === normalized) {
+                delete this.clientCache[key];
+            }
+        }
+    },
+
+    clearAllCache() {
+        this.clientCache = {};
+    },
+    
     // Current user info
     user: {
         email: '',
@@ -616,7 +640,14 @@ const GoogleAPI = {
     /**
      * Generic sheets data fetching
      */
-    async getSheetData(range) {
+    async getSheetData(range, forceRefresh = false) {
+        const now = Date.now();
+        if (!forceRefresh && this.clientCache[range] && (now - this.clientCache[range].timestamp < this.cacheExpiryMs)) {
+            console.log(`Cache hit for range: ${range}`);
+            return this.clientCache[range].data;
+        }
+
+        let data;
         if (this.config.appsScriptUrl) {
             const url = `${this.config.appsScriptUrl}?action=read&token=${encodeURIComponent(this.idToken)}&spreadsheetId=${encodeURIComponent(this.config.spreadsheetId)}&range=${encodeURIComponent(range)}`;
             const response = await fetch(url);
@@ -627,20 +658,29 @@ const GoogleAPI = {
             if (!result.success) {
                 throw new Error(result.error || "Error al leer datos mediante el script");
             }
-            return result.values || [];
+            data = result.values || [];
+        } else {
+            const response = await gapi.client.sheets.spreadsheets.values.get({
+                spreadsheetId: this.config.spreadsheetId,
+                range: range
+            });
+            data = response.result.values || [];
         }
 
-        const response = await gapi.client.sheets.spreadsheets.values.get({
-            spreadsheetId: this.config.spreadsheetId,
-            range: range
-        });
-        return response.result.values || [];
+        // Save in cache
+        this.clientCache[range] = {
+            data: data,
+            timestamp: now
+        };
+        return data;
     },
 
     /**
      * Generic sheets data appending
      */
     async appendSheetData(range, values) {
+        const sheetName = this.getSheetNameFromRange(range);
+        this.invalidateCacheForSheet(sheetName);
         if (this.config.appsScriptUrl) {
             const response = await fetch(this.config.appsScriptUrl, {
                 method: 'POST',
@@ -677,6 +717,8 @@ const GoogleAPI = {
      * Generic sheets row updates
      */
     async updateSheetRow(range, values) {
+        const sheetName = this.getSheetNameFromRange(range);
+        this.invalidateCacheForSheet(sheetName);
         if (this.config.appsScriptUrl) {
             const response = await fetch(this.config.appsScriptUrl, {
                 method: 'POST',
@@ -713,6 +755,8 @@ const GoogleAPI = {
      * Generic sheets row deletion (by clearing values)
      */
     async clearSheetRange(range) {
+        const sheetName = this.getSheetNameFromRange(range);
+        this.invalidateCacheForSheet(sheetName);
         if (this.config.appsScriptUrl) {
             const response = await fetch(this.config.appsScriptUrl, {
                 method: 'POST',

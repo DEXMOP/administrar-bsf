@@ -96,6 +96,23 @@ const App = {
             this.elements.errorModal.classList.add('hidden');
         });
 
+        // Force refresh cache on clicking syncStatus badge
+        if (this.elements.syncStatus) {
+            this.elements.syncStatus.style.cursor = 'pointer';
+            this.elements.syncStatus.title = 'Hacer clic para forzar actualización';
+            this.elements.syncStatus.addEventListener('click', async () => {
+                GoogleAPI.clearAllCache();
+                this.showLoader("Actualizando datos en tiempo real...");
+                try {
+                    await this.route();
+                } catch (err) {
+                    console.error("Error refresh routing", err);
+                } finally {
+                    this.hideLoader();
+                }
+            });
+        }
+
         // Close mobile drawer when clicking a link
         document.querySelectorAll('.sidebar-menu .nav-item').forEach(link => {
             link.addEventListener('click', () => {
