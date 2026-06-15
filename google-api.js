@@ -383,7 +383,7 @@ const GoogleAPI = {
                 const response = await fetch(url, {
                     method: 'POST',
                     mode: 'cors',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify({
                         action: 'determineUserRole',
                         token: this.idToken,
@@ -485,7 +485,7 @@ const GoogleAPI = {
             const response = await fetch(this.config.appsScriptUrl, {
                 method: 'POST',
                 mode: 'cors',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify({
                     action: 'uploadImage',
                     token: this.idToken,
@@ -605,7 +605,7 @@ const GoogleAPI = {
             const response = await fetch(this.config.appsScriptUrl, {
                 method: 'POST',
                 mode: 'cors',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify({
                     action: 'append',
                     token: this.idToken,
@@ -641,7 +641,7 @@ const GoogleAPI = {
             const response = await fetch(this.config.appsScriptUrl, {
                 method: 'POST',
                 mode: 'cors',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify({
                     action: 'update',
                     token: this.idToken,
@@ -677,7 +677,7 @@ const GoogleAPI = {
             const response = await fetch(this.config.appsScriptUrl, {
                 method: 'POST',
                 mode: 'cors',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify({
                     action: 'clear',
                     token: this.idToken,
@@ -889,7 +889,7 @@ const GoogleAPI = {
         const response = await fetch(this.config.appsScriptUrl, {
             method: 'POST',
             mode: 'cors',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({
                 action: 'manage_asset',
                 token: this.idToken,
@@ -918,7 +918,7 @@ const GoogleAPI = {
         const response = await fetch(this.config.appsScriptUrl, {
             method: 'POST',
             mode: 'cors',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({
                 action: 'start_batch',
                 token: this.idToken,
@@ -947,7 +947,7 @@ const GoogleAPI = {
         const response = await fetch(this.config.appsScriptUrl, {
             method: 'POST',
             mode: 'cors',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({
                 action: 'close_batch',
                 token: this.idToken,
@@ -976,7 +976,7 @@ const GoogleAPI = {
         const response = await fetch(this.config.appsScriptUrl, {
             method: 'POST',
             mode: 'cors',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({
                 action: 'transfer_asset',
                 token: this.idToken,
@@ -1152,7 +1152,7 @@ const GoogleAPI = {
         const response = await fetch(this.config.appsScriptUrl, {
             method: 'POST',
             mode: 'cors',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({
                 action: 'add_clima',
                 token: this.idToken,
