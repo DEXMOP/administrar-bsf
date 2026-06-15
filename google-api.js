@@ -106,6 +106,17 @@ const GoogleAPI = {
                     }
                 }
             });
+
+            // Render Google Sign-in button over login placeholder if Apps Script is configured
+            if (this.config && this.config.appsScriptUrl) {
+                const btn = document.getElementById("btn-login");
+                if (btn) {
+                    google.accounts.id.renderButton(
+                        btn,
+                        { theme: "filled_blue", size: "large", width: 320 }
+                    );
+                }
+            }
         } catch (err) {
             console.error("GSI Credential Client init error", err);
         }
@@ -191,6 +202,15 @@ const GoogleAPI = {
                 localStorage.removeItem('bsf_access_token');
                 localStorage.removeItem('bsf_token_expiry');
                 onStatusChange('logged-out');
+                
+                // Render Google button directly over login placeholder
+                const btn = document.getElementById("btn-login");
+                if (btn) {
+                    google.accounts.id.renderButton(
+                        btn,
+                        { theme: "filled_blue", size: "large", width: 320 }
+                    );
+                }
                 return;
             }
 
