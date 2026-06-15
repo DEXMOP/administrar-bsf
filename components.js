@@ -188,12 +188,20 @@ const Components = {
                 const folderIdEl = document.getElementById('setup-folder-id');
                 const scriptUrlEl = document.getElementById('setup-script-url');
 
+                const scriptUrlVal = scriptUrlEl ? scriptUrlEl.value.trim() : '';
+                if (scriptUrlVal) {
+                    if (!scriptUrlVal.startsWith('https://script.google.com/macros/s/') || !scriptUrlVal.endsWith('/exec')) {
+                        alert('Error: La URL de Apps Script debe comenzar con "https://script.google.com/macros/s/" y terminar con "/exec". Por favor verifica que estés usando la URL de la implementación como Aplicación Web de Google Apps Script (y no el enlace de edición).');
+                        return;
+                    }
+                }
+
                 const config = {
                     apiKey: apiKeyEl ? apiKeyEl.value.trim() : '',
                     clientId: clientIdEl ? clientIdEl.value.trim() : '',
                     spreadsheetId: sheetIdEl ? sheetIdEl.value.trim() : '',
                     driveFolderId: (folderIdEl && folderIdEl.value.trim()) ? folderIdEl.value.trim() : null,
-                    appsScriptUrl: (scriptUrlEl && scriptUrlEl.value.trim()) ? scriptUrlEl.value.trim() : null
+                    appsScriptUrl: scriptUrlVal || null
                 };
                 onSaveCallback(config);
             });

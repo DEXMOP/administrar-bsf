@@ -331,7 +331,14 @@ const GoogleAPI = {
             if (this.config.appsScriptUrl) {
                 // If Web App backend is configured, we bypass GAPI client calls entirely
                 onStatusChange('checking-permissions');
-                await this.determineUserRole(onError);
+                try {
+                    await this.determineUserRole(onError);
+                } catch (determineErr) {
+                    if (determineErr.message.includes('Failed to fetch') || determineErr.toString().includes('Failed to fetch')) {
+                        throw new Error('No se pudo conectar con el servidor (Failed to fetch). Esto suele deberse a un bloqueador de anuncios (AdBlock/Privacy) que interfiere con Google Apps Script, a una URL de Apps Script incorrecta o a una falta de conexión a internet');
+                    }
+                    throw determineErr;
+                }
                 onStatusChange('connected');
                 return;
             }
