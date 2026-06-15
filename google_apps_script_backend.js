@@ -12,6 +12,7 @@
 
 function doGet(e) {
   try {
+    setupWeatherTrigger();
     var action = e.parameter.action;
     var spreadsheetId = e.parameter.spreadsheetId;
     var idToken = e.parameter.token;
@@ -122,11 +123,11 @@ function doPost(e) {
     var sysDateTimeStr = Utilities.formatDate(new Date(), "America/Lima", "yyyy-MM-dd HH:mm:ss");
 
     // ==========================================
-    // ACCIÓN: manage_asset (Solo Admin/Socio)
+    // ACCIÓN: manage_asset (Solo Operario/Socio/Admin)
     // ==========================================
     if (action === 'manage_asset') {
-      if (role !== 'Administrador' && role !== 'Socio') {
-        return JSONResponse({ success: false, error: "Acceso denegado: Solo Administradores o Socios pueden gestionar activos." });
+      if (role === 'Observador') {
+        return JSONResponse({ success: false, error: "Acceso denegado: Permisos insuficientes." });
       }
       
       var assetIds = payload.assetIds;
@@ -393,6 +394,157 @@ function doPost(e) {
       }
     }
 
+    // ==========================================
+    // ACCIÓN: transfer_asset (Operario/Socio/Admin)
+    // ==========================================
+    if (action === 'transfer_asset') {
+      if (role === 'Observador') {
+        return JSONResponse({ success: false, error: "Acceso denegado: Permisos insuficientes." });
+      }
+      
+      var oldAssetId = payload.oldAssetId;
+      var newAssetId = payload.newAssetId;
+      var discardOld = payload.discardOld;
+      
+      if (!oldAssetId || !newAssetId) {
+        return JSONResponse({ success: false, error: "Faltan las bandejas origen o destino." });
+      }
+      
+      var camSheet = ss.getSheetByName('Camas');
+      if (!camSheet) return JSONResponse({ success: false, error: "Hoja Camas no encontrada" });
+      
+      var lock = LockService.getScriptLock();
+      try {
+        lock.waitLock(10000);
+      } catch (lockErr) {
+        return JSONResponse({ success: false, error: "Servidor ocupado. Intente de nuevo." });
+      }
+      
+      try {
+        var data = camSheet.getDataRange().getValues();
+        var oldRowIdx = -1;
+        var newRowIdx = -1;
+        
+        var oldGroup = '';
+        var oldCicloId = '';
+        var oldEstado = '';
+        
+        for (var i = 1; i < data.length; i++) {
+          var idStr = data[i][0].toString().trim();
+          if (idStr === oldAssetId.toString().trim()) {
+            oldRowIdx = i + 1;
+            oldEstado = data[i][1].toString().trim();
+            oldGroup = data[i][2] || 'Sin Grupo';
+            oldCicloId = data[i][3] || '';
+          }
+          if (idStr === newAssetId.toString().trim()) {
+            newRowIdx = i + 1;
+            var newEstado = data[i][1].toString().trim();
+            if (newEstado !== 'Disponible') {
+              return JSONResponse({ success: false, error: "La tina destino " + newAssetId + " ya no está Disponible (Estado: " + newEstado + ")" });
+            }
+          }
+        }
+        
+        if (oldRowIdx === -1) {
+          return JSONResponse({ success: false, error: "La tina de origen " + oldAssetId + " no existe." });
+        }
+        if (newRowIdx === -1) {
+          return JSONResponse({ success: false, error: "La tina de destino " + newAssetId + " no existe." });
+        }
+        if (oldEstado !== 'En Servicio') {
+          return JSONResponse({ success: false, error: "La tina de origen " + oldAssetId + " no está En Servicio." });
+        }
+        
+        // Realizar Traspaso en la hoja Camas
+        // 1. Asignar el lote y el ciclo a la nueva tina
+        camSheet.getRange(newRowIdx, 2, 1, 3).setValues([['En Servicio', oldGroup, oldCicloId]]);
+        
+        // 2. Liberar o dar de baja la tina de origen
+        var oldNewEstado = discardOld ? 'Baja' : 'Disponible';
+        camSheet.getRange(oldRowIdx, 2, 1, 3).setValues([[oldNewEstado, '', '']]);
+        
+        // 3. Escribir en Registro_Etapas
+        var stageSheet = ss.getSheetByName('Registro_Etapas');
+        if (stageSheet) {
+          var timestamp = Date.now();
+          
+          // Registro para la tina de origen
+          var logOld = [
+            "STAGE_" + timestamp + "_" + Math.floor(Math.random()*1000) + "_old",
+            oldAssetId,
+            sysDateTimeStr,
+            "En Servicio",
+            oldNewEstado,
+            "Traspaso de contenido realizado a tina " + newAssetId + " (Ciclo: " + oldCicloId + ")",
+            name
+          ];
+          
+          // Registro para la tina de destino
+          var logNew = [
+            "STAGE_" + timestamp + "_" + Math.floor(Math.random()*1000) + "_new",
+            newAssetId,
+            sysDateTimeStr,
+            "Disponible",
+            "En Servicio",
+            "Traspaso recibido de tina " + oldAssetId + " (Ciclo: " + oldCicloId + ")",
+            name
+          ];
+          
+          stageSheet.appendRow(logOld);
+          stageSheet.appendRow(logNew);
+          CacheService.getScriptCache().remove("CACHE_DATA_Registro_Etapas");
+        }
+        
+        CacheService.getScriptCache().remove("CACHE_DATA_Camas");
+        return JSONResponse({ success: true });
+        
+      } finally {
+        lock.releaseLock();
+      }
+    }
+
+    // ==========================================
+    // ACCIÓN: add_clima (Operario/Socio/Admin)
+    // ==========================================
+    if (action === 'add_clima') {
+      if (role === 'Observador') {
+        return JSONResponse({ success: false, error: "Acceso denegado: Permisos insuficientes." });
+      }
+      
+      var temp = parseFloat(payload.temp);
+      var hum = parseFloat(payload.hum);
+      var obs = payload.obs || '';
+      
+      if (isNaN(temp) || isNaN(hum)) {
+        return JSONResponse({ success: false, error: "Temperatura y humedad deben ser valores numéricos válidos." });
+      }
+      
+      var climaSheet = ss.getSheetByName('Clima');
+      if (!climaSheet) {
+        climaSheet = ss.insertSheet('Clima');
+        climaSheet.appendRow(['ID_Registro', 'Fecha_Hora', 'Temperatura', 'Humedad', 'Origen', 'Observacion']);
+      }
+      
+      var lock = LockService.getScriptLock();
+      try {
+        lock.waitLock(10000);
+      } catch (lockErr) {
+        return JSONResponse({ success: false, error: "Servidor ocupado. Intente de nuevo." });
+      }
+      
+      try {
+        var id = "WEATHER_" + Date.now();
+        var sysDateTimeStr = Utilities.formatDate(new Date(), "America/Lima", "yyyy-MM-dd HH:mm:ss");
+        
+        climaSheet.appendRow([id, sysDateTimeStr, temp, hum, 'Manual - Planta', obs]);
+        CacheService.getScriptCache().remove("CACHE_DATA_Clima");
+        return JSONResponse({ success: true });
+      } finally {
+        lock.releaseLock();
+      }
+    }
+
     // 2. Control de accesos por roles (RBAC Server-Side)
     var range = payload.range;
     var sheetName = range ? range.split('!')[0] : '';
@@ -643,4 +795,89 @@ function applyServerSideAuditing(sheetName, values, role) {
 function JSONResponse(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function cronFetchWeather() {
+  var activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  if (!activeSpreadsheet) {
+    var files = DriveApp.getFilesByName("BSF BioManager");
+    if (files.hasNext()) {
+      activeSpreadsheet = SpreadsheetApp.open(files.next());
+    }
+  }
+  
+  if (!activeSpreadsheet) {
+    Logger.log("No active spreadsheet found");
+    return;
+  }
+  
+  var climaSheet = activeSpreadsheet.getSheetByName('Clima');
+  if (!climaSheet) {
+    climaSheet = activeSpreadsheet.insertSheet('Clima');
+    climaSheet.appendRow(['ID_Registro', 'Fecha_Hora', 'Temperatura', 'Humedad', 'Origen', 'Observacion']);
+  }
+  
+  var now = new Date();
+  var formattedHour = Utilities.formatDate(now, "America/Lima", "yyyy-MM-dd HH");
+  
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch (e) {
+    Logger.log("Could not obtain lock");
+    return;
+  }
+  
+  try {
+    var data = climaSheet.getDataRange().getValues();
+    var alreadyHasEntry = false;
+    for (var i = 1; i < data.length; i++) {
+      var rowDateStr = data[i][1] ? data[i][1].toString() : '';
+      var rowOrigen = data[i][4] ? data[i][4].toString() : '';
+      if (rowDateStr.indexOf(formattedHour) === 0 && rowOrigen === 'API Open-Meteo') {
+        alreadyHasEntry = true;
+        break;
+      }
+    }
+    
+    if (alreadyHasEntry) {
+      Logger.log("Already has API entry for " + formattedHour);
+      return;
+    }
+    
+    // Fetch from internet
+    var url = "https://api.open-meteo.com/v1/forecast?latitude=-11.0543&longitude=-75.3306&current=temperature_2m,relative_humidity_2m&timezone=America/Lima";
+    var response = UrlFetchApp.fetch(url);
+    var json = JSON.parse(response.getContentText());
+    var temp = json.current.temperature_2m;
+    var hum = json.current.relative_humidity_2m;
+    
+    var sysDateTimeStr = Utilities.formatDate(now, "America/Lima", "yyyy-MM-dd HH:mm:ss");
+    var id = "API_" + now.getTime();
+    
+    climaSheet.appendRow([id, sysDateTimeStr, temp, hum, 'API Open-Meteo', '']);
+    CacheService.getScriptCache().remove("CACHE_DATA_Clima");
+    Logger.log("Successfully recorded API weather for " + sysDateTimeStr);
+  } catch (e) {
+    Logger.log("Error fetching weather: " + e.toString());
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function setupWeatherTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var exists = false;
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'cronFetchWeather') {
+      exists = true;
+      break;
+    }
+  }
+  if (!exists) {
+    ScriptApp.newTrigger('cronFetchWeather')
+      .timeBased()
+      .everyHours(1)
+      .create();
+  }
 }

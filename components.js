@@ -491,93 +491,313 @@ const Components = {
      * Render 1.5. Climatology Mock View (Room Climate)
      */
     async renderClimatology(containerId, showLoading, hideLoading) {
+        showLoading("Cargando Climatología...");
         const container = document.getElementById(containerId);
+
+        let clima = [];
+        try {
+            clima = await GoogleAPI.getClimaData();
+        } catch (err) {
+            console.error("Error loading clima data", err);
+        }
+
+        hideLoading();
+
+        // Process latest records
+        const climaRecords = clima.slice(1).filter(r => r && r[0]);
+        // Sort ascending by Date
+        climaRecords.sort((a, b) => new Date(a[1].replace(' ', 'T')) - new Date(b[1].replace(' ', 'T')));
+
+        // Latest manual record (if any)
+        const latestManual = [...climaRecords].reverse().find(r => r[4] === 'Manual - Planta');
+        // Latest API record (if any)
+        const latestApi = [...climaRecords].reverse().find(r => r[4] === 'API Open-Meteo');
+
+        const isObservador = GoogleAPI.user.role === 'Observador';
+
         container.innerHTML = `
             <div class="slide-in-view">
-                <!-- Planning Ribbon -->
-                <div class="card p-3 mb-4 text-center" style="border-left: 4px solid var(--brand-primary); background-color: rgba(34, 197, 94, 0.05);">
-                    <h4 style="color: var(--brand-primary);"><i class="fa-solid fa-clock-rotate-left"></i> MÓDULO PLANIFICADO PARA EL FUTURO</h4>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                        Monitoreo de Climatología y Sensores Automáticos en Tiempo Real. Esta vista está diseñada para integrarse con sensores de IoT próximamente.
-                    </p>
-                </div>
-
-                <!-- Climate Dashboard Layout -->
-                <div class="dashboard-grid">
-                    <!-- Room 1 (Neonatos / Larvas Jóvenes) -->
-                    <div class="card p-4 text-center">
-                        <h3 class="mb-3"><i class="fa-solid fa-door-closed text-success"></i> Sala 1: Maternidad y Eclosión</h3>
-                        <p style="font-size: 0.8rem; color: var(--text-secondary);" class="mb-3">Optimizado para Huevos y Neonatos</p>
-                        
-                        <div style="display: flex; justify-content: space-around; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-                            <!-- Temperature Meter -->
-                            <div style="flex: 1;">
-                                <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary);">Temperatura</div>
-                                <div style="font-size: 2rem; font-weight: bold; color: var(--text-success); margin: 0.25rem 0;">28.5 °C</div>
-                                <div style="height: 6px; width: 100%; background: var(--bg-primary); border-radius: 3px; overflow: hidden;">
-                                    <div style="height: 100%; width: 75%; background: var(--text-success);"></div>
+                <!-- Overview Cards -->
+                <div class="dashboard-grid mb-4" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                    <!-- Latest Intern (Manual) -->
+                    <div class="card p-4 text-center" style="border-left: 4px solid #ef4444; background-color: var(--bg-secondary);">
+                        <h3 class="mb-2"><i class="fa-solid fa-house-laptop text-danger"></i> Clima Interno (Sala)</h3>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary);" class="mb-3">Último registro manual en planta</p>
+                        ${latestManual ? `
+                            <div style="display: flex; justify-content: space-around; gap: 1rem; margin-bottom: 0.5rem;">
+                                <div>
+                                    <small style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary); display: block;">Temp</small>
+                                    <strong style="font-size: 1.8rem; color: #ef4444;">${parseFloat(latestManual[2]).toFixed(1)} °C</strong>
                                 </div>
-                                <small style="font-size: 0.7rem; color: var(--text-secondary);">Ideal (27-30°C)</small>
-                            </div>
-                            <!-- Humidity Meter -->
-                            <div style="flex: 1;">
-                                <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary);">Humedad</div>
-                                <div style="font-size: 2rem; font-weight: bold; color: var(--text-success); margin: 0.25rem 0;">65 %</div>
-                                <div style="height: 6px; width: 100%; background: var(--bg-primary); border-radius: 3px; overflow: hidden;">
-                                    <div style="height: 100%; width: 65%; background: var(--text-success);"></div>
+                                <div>
+                                    <small style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary); display: block;">Humedad</small>
+                                    <strong style="font-size: 1.8rem; color: #1d4ed8;">${parseFloat(latestManual[3]).toFixed(0)} %</strong>
                                 </div>
-                                <small style="font-size: 0.7rem; color: var(--text-secondary);">Ideal (60-70%)</small>
                             </div>
-                        </div>
-                        <div class="alert-item success p-2 text-center" style="font-size: 0.8rem; display: block; border-radius: var(--radius-sm);">
-                            <i class="fa-solid fa-circle-check"></i> Ambiente Estable
-                        </div>
+                            <small class="text-secondary" style="font-size: 0.75rem;">Fecha: ${latestManual[1]}</small>
+                            ${latestManual[5] ? `<div class="mt-2 text-warning" style="font-size: 0.8rem; font-style: italic;">"${latestManual[5]}"</div>` : ''}
+                        ` : `
+                            <p class="text-secondary py-3">No hay registros manuales aún</p>
+                        `}
                     </div>
 
-                    <!-- Room 2 (Crecimiento / Engorde) -->
-                    <div class="card p-4 text-center">
-                        <h3 class="mb-3"><i class="fa-solid fa-door-closed text-success"></i> Sala 2: Engorde de Larvas</h3>
-                        <p style="font-size: 0.8rem; color: var(--text-secondary);" class="mb-3">Optimizado para Larvas Medianas y Grandes</p>
-                        
-                        <div style="display: flex; justify-content: space-around; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-                            <!-- Temperature Meter -->
-                            <div style="flex: 1;">
-                                <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary);">Temperatura</div>
-                                <div style="font-size: 2rem; font-weight: bold; color: var(--text-warning); margin: 0.25rem 0;">31.2 °C</div>
-                                <div style="height: 6px; width: 100%; background: var(--bg-primary); border-radius: 3px; overflow: hidden;">
-                                    <div style="height: 100%; width: 85%; background: var(--text-warning);"></div>
+                    <!-- Latest Extern (API Open-Meteo) -->
+                    <div class="card p-4 text-center" style="border-left: 4px solid #f97316; background-color: var(--bg-secondary);">
+                        <h3 class="mb-2"><i class="fa-solid fa-cloud-sun text-warning"></i> Clima Externo</h3>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary);" class="mb-3">La Merced (API Open-Meteo)</p>
+                        ${latestApi ? `
+                            <div style="display: flex; justify-content: space-around; gap: 1rem; margin-bottom: 0.5rem;">
+                                <div>
+                                    <small style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary); display: block;">Temp</small>
+                                    <strong style="font-size: 1.8rem; color: #f97316;">${parseFloat(latestApi[2]).toFixed(1)} °C</strong>
                                 </div>
-                                <small style="font-size: 0.7rem; color: var(--text-warning);">Caluroso (>30°C)</small>
-                            </div>
-                            <!-- Humidity Meter -->
-                            <div style="flex: 1;">
-                                <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary);">Humedad</div>
-                                <div style="font-size: 2rem; font-weight: bold; color: var(--text-success); margin: 0.25rem 0;">61 %</div>
-                                <div style="height: 6px; width: 100%; background: var(--bg-primary); border-radius: 3px; overflow: hidden;">
-                                    <div style="height: 100%; width: 61%; background: var(--text-success);"></div>
+                                <div>
+                                    <small style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary); display: block;">Humedad</small>
+                                    <strong style="font-size: 1.8rem; color: #06b6d4;">${parseFloat(latestApi[3]).toFixed(0)} %</strong>
                                 </div>
-                                <small style="font-size: 0.7rem; color: var(--text-secondary);">Ideal (60-70%)</small>
                             </div>
-                        </div>
-                        <div class="alert-item warning p-2 text-center" style="font-size: 0.8rem; display: block; border-radius: var(--radius-sm);">
-                            <i class="fa-solid fa-triangle-exclamation"></i> Temperatura ligeramente alta
-                        </div>
+                            <small class="text-secondary" style="font-size: 0.75rem;">Fecha: ${latestApi[1]}</small>
+                            <div class="mt-2 text-secondary" style="font-size: 0.75rem;"><span class="badge warning" style="background: rgba(249,115,22,0.1); color: #f97316; padding: 0.15rem 0.4rem; border-radius: 4px;">sacado de internet</span></div>
+                        ` : `
+                            <p class="text-secondary py-3">No hay registros de internet aún</p>
+                        `}
                     </div>
                 </div>
 
-                <!-- Sensor charts simulated -->
-                <div class="card mt-4 p-4">
-                    <h3 class="mb-3"><i class="fa-solid fa-chart-area text-success"></i> Gráficos Históricos Simulados</h3>
-                    <div style="height: 250px; display: flex; align-items: center; justify-content: center; background: var(--bg-secondary); border-radius: var(--radius-sm); border: 1px dashed var(--border-color);">
-                        <div class="text-center text-secondary">
-                            <i class="fa-solid fa-chart-line" style="font-size: 3rem; margin-bottom: 0.75rem;"></i>
-                            <p>El gráfico histórico de 24 horas aparecerá automáticamente al conectar los sensores.</p>
-                        </div>
+                <!-- Registration Form (Section 1) -->
+                <div class="card p-4 mb-4">
+                    <h3 class="mb-3 text-success"><i class="fa-solid fa-square-plus"></i> Registrar Clima Manual - Planta</h3>
+                    ${isObservador ? `
+                        <div class="text-center text-secondary py-3">El rol 'Observador' no tiene permisos para registrar clima.</div>
+                    ` : `
+                        <form id="form-add-clima" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) auto; gap: 1rem; align-items: flex-end;">
+                            <div class="form-group mb-0" style="margin-bottom: 0;">
+                                <label class="form-label" for="clima-temp">Temperatura de la Sala (°C)</label>
+                                <input type="number" inputmode="decimal" id="clima-temp" class="form-control" placeholder="Ej: 28.5" step="0.1" required>
+                            </div>
+                            <div class="form-group mb-0" style="margin-bottom: 0;">
+                                <label class="form-label" for="clima-hum">Humedad de la Sala (%)</label>
+                                <input type="number" inputmode="decimal" id="clima-hum" class="form-control" placeholder="Ej: 65" step="1" min="0" max="100" required>
+                            </div>
+                            <div class="form-group mb-0" style="margin-bottom: 0;">
+                                <label class="form-label" for="clima-obs">Observación / Nota</label>
+                                <input type="text" id="clima-obs" class="form-control" placeholder="Ej: Humedad elevada, ventilador encendido">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="height: 42px;">
+                                <i class="fa-solid fa-floppy-disk"></i> Registrar Clima
+                            </button>
+                        </form>
+                    `}
+                </div>
+
+                <!-- Climate Dual Chart (Section 2) -->
+                <div class="card p-4">
+                    <h3 class="mb-3"><i class="fa-solid fa-chart-line text-success"></i> Comparativa Clima Ambiental (Últimos 3-5 días)</h3>
+                    <div style="height: 320px; position: relative;">
+                        <canvas id="chart-clima-ambiental" style="width: 100%; height: 100%;"></canvas>
                     </div>
                 </div>
             </div>
         `;
-    },
+
+        // Wire form submit
+        if (!isObservador) {
+            const formClima = document.getElementById('form-add-clima');
+            if (formClima) {
+                formClima.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    if (GoogleAPI.user.role === 'Observador') {
+                        alert("Acceso denegado: El rol 'Observador' no puede ingresar datos.");
+                        return;
+                    }
+
+                    const temp = parseFloat(document.getElementById('clima-temp').value);
+                    const hum = parseFloat(document.getElementById('clima-hum').value);
+                    const obs = document.getElementById('clima-obs').value.trim();
+
+                    const payload = { temp, hum, obs };
+
+                    // Reset form immediately
+                    formClima.reset();
+
+                    // Submit offline-first via executeBackgroundSubmit
+                    executeBackgroundSubmit('add-clima', payload, async () => {
+                        await GoogleAPI.addClimaRecord(temp, hum, obs);
+                    });
+
+                    // Wait slightly and refresh
+                    setTimeout(() => {
+                        this.renderClimatology(containerId, showLoading, hideLoading);
+                    }, 1500);
+                });
+            }
+        }
+
+        // Render Chart.js
+        const ctx = document.getElementById('chart-clima-ambiental');
+        if (ctx) {
+            // Filter last 4 days of records (from 3 to 5 days)
+            const fourDaysAgo = new Date();
+            fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
+
+            let filteredClima = climaRecords.filter(r => new Date(r[1].replace(' ', 'T')) >= fourDaysAgo);
+            if (filteredClima.length === 0) {
+                // Fallback to last 24 entries if empty in last 4 days
+                filteredClima = climaRecords.slice(-24);
+            }
+
+            // Align on hourly X-axis
+            const hoursSet = new Set();
+            filteredClima.forEach(r => {
+                const dateStr = r[1];
+                if (dateStr) {
+                    const hourStr = dateStr.substring(0, 13) + ":00";
+                    hoursSet.add(hourStr);
+                }
+            });
+            const sortedHours = Array.from(hoursSet).sort();
+
+            const manualTempData = [];
+            const manualHumData = [];
+            const apiTempData = [];
+            const apiHumData = [];
+
+            sortedHours.forEach(hour => {
+                const hourPrefix = hour.substring(0, 13);
+                
+                const mRec = filteredClima.find(r => r[1].startsWith(hourPrefix) && r[4] === 'Manual - Planta');
+                const aRec = filteredClima.find(r => r[1].startsWith(hourPrefix) && r[4] === 'API Open-Meteo');
+
+                manualTempData.push(mRec ? parseFloat(mRec[2]) : null);
+                manualHumData.push(mRec ? parseFloat(mRec[3]) : null);
+
+                apiTempData.push(aRec ? parseFloat(aRec[2]) : null);
+                apiHumData.push(aRec ? parseFloat(aRec[3]) : null);
+            });
+
+            // Map sortedHours labels to a readable date format
+            const labels = sortedHours.map(h => {
+                try {
+                    const [datePart, timePart] = h.split(' ');
+                    const [y, m, d] = datePart.split('-');
+                    const hour = timePart.split(':')[0];
+                    const date = new Date(y, m - 1, d);
+                    const dayMonth = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+                    return `${dayMonth} - ${hour}h`;
+                } catch (e) {
+                    return h;
+                }
+            });
+
+            const isDark = document.body.classList.contains('dark-theme');
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+            const gridColor = isDark ? '#1e293b' : '#e2e8f0';
+
+            new Chart(ctx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: labels.length > 0 ? labels : ['Sin Datos'],
+                    datasets: [
+                        {
+                            label: 'Temp Interna (Manual - Planta)',
+                            data: manualTempData,
+                            borderColor: '#ef4444', // Red Line
+                            backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                            borderWidth: 2.5,
+                            tension: 0.35,
+                            yAxisID: 'y',
+                            spanGaps: true
+                        },
+                        {
+                            label: 'Temp Externa (API Open-Meteo)',
+                            data: apiTempData,
+                            borderColor: '#f97316', // Orange
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [6, 4], // Dotted
+                            tension: 0.35,
+                            yAxisID: 'y',
+                            spanGaps: true
+                        },
+                        {
+                            label: 'Humedad Interna (Manual - Planta)',
+                            data: manualHumData,
+                            borderColor: '#1d4ed8', // Dark Blue
+                            backgroundColor: 'rgba(29, 78, 216, 0.05)',
+                            borderWidth: 2.5,
+                            tension: 0.35,
+                            yAxisID: 'y1',
+                            spanGaps: true
+                        },
+                        {
+                            label: 'Humedad Externa (API Open-Meteo)',
+                            data: apiHumData,
+                            borderColor: '#06b6d4', // Celeste / Cyan
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [6, 4], // Dotted
+                            tension: 0.35,
+                            yAxisID: 'y1',
+                            spanGaps: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: textColor, font: { family: 'Outfit', size: 11 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.parsed.y;
+                                    const label = context.dataset.label.split(' ')[0];
+                                    const isExternal = context.dataset.label.includes('Externa') || context.dataset.label.includes('API');
+                                    const originLabel = isExternal ? 'API Open-Meteo (sacado de internet)' : 'Manual - Planta';
+                                    const unit = context.dataset.yAxisID === 'y' ? '°C' : '%';
+                                    return `${label}: ${value} ${unit} (${originLabel})`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: gridColor },
+                            ticks: { color: textColor, font: { family: 'Inter', size: 10 } }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Temperatura (°C)',
+                                color: textColor,
+                                font: { family: 'Outfit', weight: 'bold' }
+                            },
+                            grid: { color: gridColor },
+                            ticks: { color: textColor }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Humedad (%)',
+                                color: textColor,
+                                font: { family: 'Outfit', weight: 'bold' }
+                            },
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: textColor },
+                            min: 0,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+    }
 
     /**
      * Render 2. Add Report Form (Independent Registries)
@@ -2754,6 +2974,11 @@ const Components = {
                         ]];
 
                         await GoogleAPI.appendSheetData('Insumos!A:J', rowValues);
+                        try {
+                            await checkAndSyncTinasOnPurchase(mName, mAction, mQty);
+                        } catch (syncErr) {
+                            console.error("Error in checkAndSyncTinasOnPurchase in quick modal:", syncErr);
+                        }
                         modal.classList.add('hidden');
                         hideLoading();
                         alert("Movimiento de inventario guardado.");
@@ -3386,7 +3611,7 @@ const Components = {
                 const isDisponible = estado === 'Disponible';
                 return `
                     <tr>
-                        <td><strong>${id}</strong></td>
+                        <td><a href="#" class="view-tina-detail text-success" data-id="${id}" style="font-weight: 600; text-decoration: underline;">${id}</a></td>
                         <td><span class="badge ${estado === 'Disponible' ? 'success' : (estado === 'En Servicio' ? 'warning' : 'danger')}" style="font-size:0.75rem;">${estado}</span></td>
                         <td>${grupo}</td>
                         <td>
@@ -3418,6 +3643,14 @@ const Components = {
                         hideLoading();
                         alert(`Error al dar de baja bandeja: ${err.message}`);
                     }
+                });
+            });
+
+            tbody.querySelectorAll('.view-tina-detail').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const id = link.getAttribute('data-id');
+                    this.showTinaDetailModal(containerId, id, camas, todayFeedMap, showLoading, hideLoading);
                 });
             });
         };
@@ -3954,6 +4187,50 @@ const Components = {
                             </div>
                         ` : ''}
 
+                        <!-- Traspasar Contenido a Otra Tina (Only for En Servicio) -->
+                        ${GoogleAPI.user.role !== 'Observador' && estado === 'En Servicio' ? `
+                            <div class="card p-3 mb-4" style="border: 1px solid var(--border-color); background-color: var(--bg-primary);">
+                                <h4 class="mb-3"><i class="fa-solid fa-arrows-left-right text-success"></i> Traspasar Contenido a Otra Tina</h4>
+                                <form id="form-transfer-asset">
+                                    <div class="form-row-2">
+                                        <div class="form-group mb-0">
+                                            <label class="form-label" for="transfer-target-asset">Tina Destino (Disponible)</label>
+                                            ${(() => {
+                                                const disponibles = camas.filter(c => c[1] === 'Disponible');
+                                                const hasDisponibles = disponibles.length > 0;
+                                                return `
+                                                <select id="transfer-target-asset" class="form-control" style="padding: 0.5rem;" ${hasDisponibles ? '' : 'disabled'} required>
+                                                    <option value="" disabled selected>${hasDisponibles ? 'Seleccione una tina disponible...' : 'No hay tinas disponibles'}</option>
+                                                    ${disponibles.map(c => `<option value="${c[0]}">${c[0]}</option>`).join('')}
+                                                </select>
+                                                `;
+                                            })()}
+                                        </div>
+                                        <div class="form-group mb-0" style="display: flex; align-items: center; padding-top: 1.5rem;">
+                                            <label class="form-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; user-select: none; margin-bottom: 0;">
+                                                <input type="checkbox" id="transfer-discard-origin" style="width: auto; height: auto; margin-top: 0;">
+                                                Desechar tina de origen (Dar de Baja)
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-warning btn-sm mt-3" style="width: auto; color: #090d16; font-weight: bold;" ${camas.filter(c => c[1] === 'Disponible').length > 0 ? '' : 'disabled'}>
+                                        <i class="fa-solid fa-arrows-left-right"></i> Ejecutar Traspaso
+                                    </button>
+                                </form>
+                            </div>
+                        ` : ''}
+
+                        <!-- Dar de Baja Tina Directamente (Only for Disponible) -->
+                        ${GoogleAPI.user.role !== 'Observador' && estado === 'Disponible' ? `
+                            <div class="card p-3 mb-4" style="border: 1px solid var(--border-color); background-color: var(--bg-primary); text-align: center;">
+                                <h4 class="mb-2"><i class="fa-solid fa-trash text-danger"></i> Dar de Baja Bandeja</h4>
+                                <p class="text-secondary mb-3" style="font-size: 0.85rem;">Esta bandeja está disponible y puede ser retirada del inventario de servicio.</p>
+                                <button id="btn-detail-retire-asset" class="btn btn-danger btn-sm" style="width: auto;">
+                                    <i class="fa-solid fa-trash"></i> Retirar Bandeja (Baja)
+                                </button>
+                            </div>
+                        ` : ''}
+
                         <!-- Timeline (Historial) -->
                         <div>
                             <h4 class="mb-3"><i class="fa-solid fa-clock-rotate-left text-success"></i> Línea de Tiempo de Actividades</h4>
@@ -4036,6 +4313,73 @@ const Components = {
                         console.error(err);
                         hideLoading();
                         alert(`Error al actualizar ciclo de vida: ${err.message}`);
+                    }
+                });
+            }
+
+            // Submit transfer form
+            const transferForm = document.getElementById('form-transfer-asset');
+            if (transferForm) {
+                transferForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    if (GoogleAPI.user.role === 'Observador') {
+                        alert("Acceso denegado: El rol 'Observador' no puede realizar esta operación.");
+                        return;
+                    }
+                    
+                    const targetAsset = document.getElementById('transfer-target-asset').value;
+                    const discardOld = document.getElementById('transfer-discard-origin').checked;
+                    
+                    if (!targetAsset) {
+                        alert("Por favor, seleccione una tina de destino.");
+                        return;
+                    }
+                    
+                    const confirmMsg = `¿Estás seguro de que deseas traspasar el contenido de la tina ${tinaId} a la tina ${targetAsset}?` + 
+                        (discardOld ? `\n\nATENCIÓN: La tina de origen ${tinaId} será dada de BAJA.` : `\n\nLa tina de origen ${tinaId} quedará Disponible.`);
+                        
+                    if (!confirm(confirmMsg)) return;
+                    
+                    modal.classList.add('hidden');
+                    showLoading("Procesando traspaso de tina...");
+                    
+                    try {
+                        await GoogleAPI.transferAsset(tinaId, targetAsset, discardOld);
+                        hideLoading();
+                        alert(`Traspaso de ${tinaId} a ${targetAsset} completado con éxito.`);
+                        
+                        // Re-render
+                        this.renderFeeding(containerId, showLoading, hideLoading);
+                    } catch (err) {
+                        console.error(err);
+                        hideLoading();
+                        alert(`Error al traspasar bandeja: ${err.message}`);
+                    }
+                });
+            }
+
+            // Direct retire from detail modal (Disponible)
+            const btnDetailRetire = document.getElementById('btn-detail-retire-asset');
+            if (btnDetailRetire) {
+                btnDetailRetire.addEventListener('click', async () => {
+                    if (GoogleAPI.user.role === 'Observador') {
+                        alert("Acceso denegado: El rol 'Observador' no puede realizar esta operación.");
+                        return;
+                    }
+                    
+                    if (!confirm(`¿Estás seguro de que deseas DAR DE BAJA la bandeja ${tinaId}?\n\nNo estará disponible para nuevos lotes.`)) return;
+                    
+                    modal.classList.add('hidden');
+                    showLoading("Dando de baja bandeja...");
+                    try {
+                        await GoogleAPI.manageAsset([tinaId], 'Baja');
+                        hideLoading();
+                        alert(`¡Bandeja ${tinaId} dada de baja con éxito!`);
+                        this.renderFeeding(containerId, showLoading, hideLoading);
+                    } catch (err) {
+                        console.error(err);
+                        hideLoading();
+                        alert(`Error al dar de baja bandeja: ${err.message}`);
                     }
                 });
             }
@@ -4185,6 +4529,9 @@ const SyncQueue = {
         else if (task.type === 'add-capital') {
             await GoogleAPI.appendSheetData('Finanzas!A:G', [task.payload.txRow]);
         }
+        else if (task.type === 'add-clima') {
+            await GoogleAPI.addClimaRecord(task.payload.temp, task.payload.hum, task.payload.obs);
+        }
     }
 };
 
@@ -4326,6 +4673,53 @@ async function submitSupplyData(payload) {
     await GoogleAPI.appendSheetData('Insumos!A:J', payload.supplyValues);
     if (payload.financeValues && payload.financeValues.length > 0) {
         await GoogleAPI.appendSheetData('Finanzas!A:G', payload.financeValues);
+    }
+
+    // Auto-sync Tinas on purchase
+    try {
+        const supplyVal = payload.supplyValues[0];
+        if (supplyVal) {
+            await checkAndSyncTinasOnPurchase(supplyVal[3], supplyVal[4], parseFloat(supplyVal[5]));
+        }
+    } catch (syncErr) {
+        console.error("Error running checkAndSyncTinasOnPurchase in submitSupplyData:", syncErr);
+    }
+}
+
+async function checkAndSyncTinasOnPurchase(supplyName, supplyAction, supplyQty) {
+    if (supplyAction === 'Adición' && supplyQty > 0) {
+        const nameLower = supplyName.toLowerCase();
+        if (nameLower.includes('tina') || nameLower.includes('bandeja') || nameLower.includes('caja') || nameLower.includes('cama')) {
+            const qty = Math.floor(supplyQty);
+            if (qty > 0) {
+                try {
+                    const camas = await GoogleAPI.getCamas();
+                    let maxId = 0;
+                    for (let i = 1; i < camas.length; i++) {
+                        const row = camas[i];
+                        if (row && row[0]) {
+                            const match = row[0].toString().trim().match(/^B-(\d+)$/i);
+                            if (match) {
+                                const num = parseInt(match[1], 10);
+                                if (num > maxId) {
+                                    maxId = num;
+                                }
+                            }
+                        }
+                    }
+                    const assetIds = [];
+                    for (let i = 1; i <= qty; i++) {
+                        const nextNum = maxId + i;
+                        const idStr = `B-${String(nextNum).padStart(3, '0')}`;
+                        assetIds.push(idStr);
+                    }
+                    await GoogleAPI.manageAsset(assetIds, 'Alta');
+                    console.log(`Auto-sincronización exitosa: ${qty} bandejas dadas de alta:`, assetIds);
+                } catch (syncErr) {
+                    console.error("Error al sincronizar cantidad de tinas con activos:", syncErr);
+                }
+            }
+        }
     }
 }
 

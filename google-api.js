@@ -278,7 +278,7 @@ const GoogleAPI = {
             });
             
             const existingSheets = spreadsheet.result.sheets.map(s => s.properties.title);
-            const requiredSheets = ['Usuarios', 'Reportes', 'Finanzas', 'Insumos', 'Camas', 'Registro_Alimentacion', 'Registro_Etapas', 'Registro_Eliminados', 'Maquinaria', 'Historico_Ciclos'];
+            const requiredSheets = ['Usuarios', 'Reportes', 'Finanzas', 'Insumos', 'Camas', 'Registro_Alimentacion', 'Registro_Etapas', 'Registro_Eliminados', 'Maquinaria', 'Historico_Ciclos', 'Clima'];
             const sheetsToCreate = requiredSheets.filter(name => !existingSheets.includes(name));
 
             // 2. Create missing sheets and initialize headers
@@ -306,6 +306,7 @@ const GoogleAPI = {
                     else if (sheetName === 'Registro_Eliminados') headers = [['ID_Eliminacion', 'Tipo_Registro', 'ID_Original', 'Fecha_Hora_Original', 'Contenido_Original', 'Fecha_Hora_Eliminacion', 'Usuario', 'Motivo']];
                     else if (sheetName === 'Maquinaria') headers = [['ID_Equipo', 'Nombre', 'Fecha_Adquisicion', 'Costo', 'Estado', 'Descripcion', 'Cantidad', 'Tamaño']];
                     else if (sheetName === 'Historico_Ciclos') headers = [['Ciclo_ID', 'Grupo', 'Bandejas_IDs', 'Fecha_Inicio', 'Fecha_Cierre', 'Alimento_Consumido_Kg', 'Biomasa_Cosechada_Kg', 'Usuario']];
+                    else if (sheetName === 'Clima') headers = [['ID_Registro', 'Fecha_Hora', 'Temperatura', 'Humedad', 'Origen', 'Observacion']];
 
                     await gapi.client.sheets.spreadsheets.values.update({
                         spreadsheetId: this.config.spreadsheetId,
@@ -325,7 +326,8 @@ const GoogleAPI = {
                 { name: 'Registro_Eliminados', expected: ['ID_Eliminacion', 'Tipo_Registro', 'ID_Original', 'Fecha_Hora_Original', 'Contenido_Original', 'Fecha_Hora_Eliminacion', 'Usuario', 'Motivo'] },
                 { name: 'Insumos', expected: ['ID_Movimiento', 'ID_Reporte', 'Fecha', 'Insumo', 'Accion', 'Cantidad', 'Unidad', 'Costo_Total', 'Categoria', 'Tamaño'] },
                 { name: 'Maquinaria', expected: ['ID_Equipo', 'Nombre', 'Fecha_Adquisicion', 'Costo', 'Estado', 'Descripcion', 'Cantidad', 'Tamaño'] },
-                { name: 'Historico_Ciclos', expected: ['Ciclo_ID', 'Grupo', 'Bandejas_IDs', 'Fecha_Inicio', 'Fecha_Cierre', 'Alimento_Consumido_Kg', 'Biomasa_Cosechada_Kg', 'Usuario'] }
+                { name: 'Historico_Ciclos', expected: ['Ciclo_ID', 'Grupo', 'Bandejas_IDs', 'Fecha_Inicio', 'Fecha_Cierre', 'Alimento_Consumido_Kg', 'Biomasa_Cosechada_Kg', 'Usuario'] },
+                { name: 'Clima', expected: ['ID_Registro', 'Fecha_Hora', 'Temperatura', 'Humedad', 'Origen', 'Observacion'] }
             ];
 
             for (const item of sheetsToCheck) {
@@ -965,6 +967,36 @@ const GoogleAPI = {
     },
 
     /**
+     * Traspasar el contenido de una tina a otra disponible
+     */
+    async transferAsset(oldAssetId, newAssetId, discardOld) {
+        if (!this.config.appsScriptUrl) {
+            throw new Error("La URL de Google Apps Script no está configurada. Se requiere el backend para traspasar contenido de bandejas.");
+        }
+        const response = await fetch(this.config.appsScriptUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'transfer_asset',
+                token: this.idToken,
+                spreadsheetId: this.config.spreadsheetId,
+                oldAssetId: oldAssetId,
+                newAssetId: newAssetId,
+                discardOld: discardOld
+            })
+        });
+        if (!response.ok) {
+            throw new Error(`Error en el servidor: ${response.statusText}`);
+        }
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.error || "Error al realizar el traspaso de bandeja");
+        }
+        return result;
+    },
+
+    /**
      * Enable a single tina manually (sets status to 'Disponible' and stage to 'Disponible')
      */
     async enableTina(tinaId) {
@@ -1101,6 +1133,43 @@ const GoogleAPI = {
             console.error("Failed to fetch users", err);
             return [];
         }
+    },
+
+    /**
+     * Get all Climate data
+     */
+    async getClimaData() {
+        return await this.getSheetData('Clima!A:F');
+    },
+
+    /**
+     * Add Climate record via doPost add_clima action
+     */
+    async addClimaRecord(temp, hum, obs = '') {
+        if (!this.config.appsScriptUrl) {
+            throw new Error("La URL de Google Apps Script no está configurada. Se requiere el backend para registrar el clima.");
+        }
+        const response = await fetch(this.config.appsScriptUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'add_clima',
+                token: this.idToken,
+                spreadsheetId: this.config.spreadsheetId,
+                temp: parseFloat(temp),
+                hum: parseFloat(hum),
+                obs: obs
+            })
+        });
+        if (!response.ok) {
+            throw new Error(`Error en el servidor: ${response.statusText}`);
+        }
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.error || "Error al registrar el clima");
+        }
+        return result;
     },
 
     decodeJwtLocally(token) {
