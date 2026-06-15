@@ -222,18 +222,36 @@ const App = {
 
     showSetupView() {
         this.hideLoader();
-        this.elements.loginContainer.classList.add('hidden');
-        this.elements.appContainer.classList.add('hidden');
+        const hasValidConfig = GoogleAPI.hasValidConfig();
         
-        // Use components to render setup form in body directly
-        document.body.insertAdjacentHTML('beforeend', '<div id="setup-view-wrapper" class="login-container"></div>');
+        const setupModal = document.getElementById('setup-modal');
+        if (!setupModal) return;
         
-        Components.renderSetup('setup-view-wrapper', (config) => {
-            GoogleAPI.saveConfig(config);
-            document.getElementById('setup-view-wrapper').remove();
-            // Reinitialize GAPI with new keys
-            this.initGoogleAPI();
-        });
+        setupModal.classList.remove('hidden');
+        
+        Components.renderSetup('setup-modal', 
+            (config) => {
+                GoogleAPI.saveConfig(config);
+                setupModal.classList.add('hidden');
+                setupModal.innerHTML = '';
+                // Reinitialize GAPI with new keys
+                this.initGoogleAPI();
+            },
+            hasValidConfig ? () => {
+                setupModal.classList.add('hidden');
+                setupModal.innerHTML = '';
+            } : null
+        );
+
+        // Allow closing when clicking the overlay backdrop if config already exists
+        if (hasValidConfig) {
+            setupModal.addEventListener('click', (e) => {
+                if (e.target === setupModal) {
+                    setupModal.classList.add('hidden');
+                    setupModal.innerHTML = '';
+                }
+            });
+        }
     },
 
     showError(message) {

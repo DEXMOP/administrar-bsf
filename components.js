@@ -109,43 +109,56 @@ const Components = {
     /**
      * Renders Setup Config Form if first time using the app
      */
-    renderSetup(containerId, onSaveCallback) {
+    renderSetup(containerId, onSaveCallback, onCancelCallback = null) {
         const container = document.getElementById(containerId);
         container.innerHTML = `
-            <div class="form-card card slide-in-view mt-3">
+            <div class="form-card card slide-in-view mt-3" style="position: relative; max-width: 550px; width: 90%; max-height: 90vh; overflow-y: auto;">
+                ${onCancelCallback ? `
+                <button type="button" id="btn-close-setup" class="btn-icon-only" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                ` : ''}
                 <div class="text-center mb-3">
                     <div class="logo-icon-large"><i class="fa-solid fa-gears"></i></div>
                     <h2>Configuración de BSF BioManager</h2>
                     <p>Conecta la aplicación con tu cuenta de Google Cloud. Este paso es necesario una sola vez.</p>
                 </div>
                 <form id="setup-form" class="mt-3">
-                    <div class="form-group">
+                    <div class="form-group mb-3">
                         <label class="form-label" for="setup-api-key">Google API Key</label>
                         <input type="text" id="setup-api-key" class="form-control" placeholder="AIzaSy..." required>
                         <small class="form-text text-secondary">Obtenida en Google Cloud Console para acceso público a datos.</small>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group mb-3">
                         <label class="form-label" for="setup-client-id">Google Client ID (OAuth 2.0)</label>
                         <input type="text" id="setup-client-id" class="form-control" placeholder="xxxxxx-xxxxxx.apps.googleusercontent.com" required>
                         <small class="form-text text-secondary">Para gestionar el inicio de sesión y autenticación segura.</small>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group mb-3">
                         <label class="form-label" for="setup-sheet-id">Google Spreadsheet ID (Base de Datos)</label>
                         <input type="text" id="setup-sheet-id" class="form-control" placeholder="1aBcDeFgHiJkLmNoPqRsTuVwXyZ..." required>
                         <small class="form-text text-secondary">Crea una hoja de cálculo vacía en Google Sheets y pega su ID aquí (lo encuentras en la URL de la hoja).</small>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group mb-3">
                         <label class="form-label" for="setup-folder-id">Google Drive Folder ID (Opcional)</label>
                         <input type="text" id="setup-folder-id" class="form-control" placeholder="Dejar en blanco para crear una nueva carpeta automáticamente">
                     </div>
-                    <div class="form-group">
-                        <label class="form-label" for="setup-script-url">Google Apps Script Web App URL (Opcional - Arquitectura Segura)</label>
+                    <div class="form-group mb-3">
+                        <label class="form-label" for="setup-script-url">Google Apps Script Web App URL (Opcional - Autorización y Cron)</label>
                         <input type="text" id="setup-script-url" class="form-control" placeholder="https://script.google.com/macros/s/XXXXX/exec">
                         <small class="form-text text-secondary">Si se configura, la app utilizará esta API de forma segura y los operarios no requerirán acceso directo al Excel.</small>
                     </div>
-                    <button type="submit" id="btn-save-setup" class="btn btn-primary btn-block mt-3">
-                        <i class="fa-solid fa-floppy-disk"></i> Guardar y Conectar
-                    </button>
+                    
+                    <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                        ${onCancelCallback ? `
+                        <button type="button" id="btn-cancel-setup" class="btn btn-outline" style="flex: 1;">
+                            Cancelar
+                        </button>
+                        ` : ''}
+                        <button type="submit" id="btn-save-setup" class="btn btn-primary" style="flex: 1;">
+                            <i class="fa-solid fa-floppy-disk"></i> Guardar
+                        </button>
+                    </div>
                 </form>
             </div>
         `;
@@ -184,6 +197,14 @@ const Components = {
                 };
                 onSaveCallback(config);
             });
+        }
+
+        // Bind cancel buttons if callback provided
+        if (onCancelCallback) {
+            const closeBtn = document.getElementById('btn-close-setup');
+            const cancelBtn = document.getElementById('btn-cancel-setup');
+            if (closeBtn) closeBtn.addEventListener('click', onCancelCallback);
+            if (cancelBtn) cancelBtn.addEventListener('click', onCancelCallback);
         }
     },
 
