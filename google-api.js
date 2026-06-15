@@ -368,7 +368,7 @@ const GoogleAPI = {
             onStatusChange('connected');
         } catch (err) {
             console.error("Database initialization failed", err);
-            onError("Error al conectar con las hojas de cálculo. Verifica que el Spreadsheet ID sea válido y que tu cuenta de Google tenga accesos compartidos.");
+            onError(`Error al conectar con las hojas de cálculo: ${err.message || err}. Verifica que el Spreadsheet ID sea válido, que tu cuenta de Google tenga accesos compartidos, y que el Apps Script esté implementado como Aplicación Web.`);
         }
     },
 
