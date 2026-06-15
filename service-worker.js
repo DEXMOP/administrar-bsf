@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bsf-biomanager-cache-v1';
+const CACHE_NAME = 'bsf-biomanager-cache-v1.2';
 const ASSETS_TO_CACHE = [
   './index.html',
   './style.css',
