@@ -1436,6 +1436,7 @@ const Components = {
                 }
             }
         });
+    }
 
         // FORM SUBMIT 2: FINANCES (Expenses)
         const addFinanceForm = document.getElementById('add-finance-form');
