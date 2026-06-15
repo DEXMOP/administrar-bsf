@@ -11,15 +11,15 @@
     --transition-speed: 0.3s;
 
     /* Light Theme (Default/Active if toggled) */
-    --bg-primary-light: #f8fafc;
+    --bg-primary-light: #f1f5f9;
     --bg-secondary-light: #ffffff;
-    --bg-sidebar-light: #f1f5f9;
-    --text-primary-light: #0f172a;
-    --text-secondary-light: #64748b;
-    --border-light: #e2e8f0;
-    --glass-bg-light: rgba(255, 255, 255, 0.7);
-    --glass-border-light: rgba(226, 232, 240, 0.8);
-    --glass-shadow-light: rgba(148, 163, 184, 0.1);
+    --bg-sidebar-light: #e2e8f0;
+    --text-primary-light: #000000;       /* Pure black for main texts */
+    --text-secondary-light: #1e293b;     /* Very dark slate for secondary texts */
+    --border-light: #94a3b8;             /* Darker slate borders */
+    --glass-bg-light: rgba(255, 255, 255, 0.95); /* Opaque white background to block sunlight bleed */
+    --glass-border-light: rgba(148, 163, 184, 0.9);
+    --glass-shadow-light: rgba(15, 23, 42, 0.15);
 
     /* Dark Theme Variables (Active by default) */
     --bg-primary-dark: #090d16;

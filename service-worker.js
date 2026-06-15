@@ -48,12 +48,13 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   
   // Exclude third-party Google APIs, OAuth2, and Apps Script backend calls from SW caching
-  const isDynamicApi = url.hostname.includes('googleapis.com') || 
+  const isDynamicApi = url.hostname.includes('script.google.com') || 
+                       url.hostname.includes('googleapis.com') || 
                        url.hostname.includes('google.com') || 
                        url.pathname.includes('/macros/s/');
                        
   if (isDynamicApi || e.request.method !== 'GET') {
-    return; // Pass through directly to network
+    return; // Pass through directly to network (Network-Only)
   }
 
   e.respondWith(

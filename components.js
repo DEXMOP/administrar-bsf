@@ -1231,7 +1231,8 @@ const Components = {
         }
 
         // FORM SUBMIT 1: DAILY REPORT & FEEDING (Bitácora)
-        document.getElementById('add-report-form').addEventListener('submit', async (e) => {
+        const formReport = document.getElementById('add-report-form');
+        formReport.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (GoogleAPI.user.role === 'Observador') {
                 alert("Acceso denegado: El rol 'Observador' no puede ingresar datos.");
@@ -1287,6 +1288,15 @@ const Components = {
                         console.warn("Fallo al verificar stock en caliente", stockErr);
                     }
                 }
+            }
+
+            // Disable submit button and show spinner to avoid UI freeze
+            const submitBtn = formReport.querySelector('button[type="submit"]');
+            let originalBtnHtml = '';
+            if (submitBtn) {
+                originalBtnHtml = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Procesando fotos...';
             }
 
             // Show a Toast immediately and begin background operation
@@ -1353,7 +1363,7 @@ const Components = {
                 };
 
                 // Clear/Reset form immediately
-                document.getElementById('add-report-form').reset();
+                formReport.reset();
                 this.selectedFiles = [];
                 previewContainer.innerHTML = '';
                 localStorage.removeItem('bsf_report_draft');
@@ -1365,6 +1375,12 @@ const Components = {
                 container.querySelectorAll('.collab-select-card[data-prefix="report"]').forEach(c => c.classList.remove('selected'));
                 container.querySelectorAll('.tina-select-card[data-prefix="report"]').forEach(c => c.classList.remove('selected'));
                 
+                // Restore submit button
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnHtml;
+                }
+
                 // Redirect user immediately
                 window.location.hash = '#reports-list';
 
@@ -1374,6 +1390,11 @@ const Components = {
             } catch (err) {
                 console.error("Report submit error", err);
                 showToast(`Error al procesar formulario: ${err.message}`, "error");
+                // Restore submit button on error
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnHtml;
+                }
             }
         });
 
@@ -4089,6 +4110,10 @@ const SyncQueue = {
                 if (this.isNetworkError(err)) {
                     showToast(`Red inestable. Quedan ${queue.length - successCount} pendientes.`, "error");
                     break;
+                } else {
+                    // Poison Pill: remove task from queue immediately if rejection from server
+                    this.remove(task.id);
+                    showToast(`Error al sincronizar: ${err.message || err}. Registro descartado por datos no válidos.`, "error");
                 }
             }
         }
