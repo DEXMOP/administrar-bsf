@@ -159,35 +159,42 @@ const GoogleAPI = {
     },
 
     checkAllInitialized(onStatusChange, onError) {
-        if (this.config && this.config.appsScriptUrl) {
-            const savedIdToken = localStorage.getItem('bsf_id_token');
-            if (savedIdToken) {
-                const payload = this.decodeJwtLocally(savedIdToken);
-                const nowSecs = Date.now() / 1000;
-                if (payload && payload.exp && nowSecs < payload.exp) {
-                    this.idToken = savedIdToken;
-                    this.user.email = payload.email;
-                    this.user.name = payload.name;
-                    this.user.picture = payload.picture || '';
-                    
-                    onStatusChange('logging-in');
-                    this.initializeDatabase(onStatusChange, onError);
-                    
-                    // Render Google Sign-in button over login placeholder if visible
-                    const btn = document.getElementById("btn-login");
-                    if (btn) {
-                        google.accounts.id.renderButton(
-                            btn,
-                            { theme: "filled_blue", size: "large", width: 280 }
-                        );
-                    }
-                    return;
-                }
-            }
-        }
-
         if (this.gapiInitialized && this.gsiInitialized) {
-            // Check if we have an active, valid token in localStorage
+            if (this.config && this.config.appsScriptUrl) {
+                const savedIdToken = localStorage.getItem('bsf_id_token');
+                if (savedIdToken) {
+                    const payload = this.decodeJwtLocally(savedIdToken);
+                    const nowSecs = Date.now() / 1000;
+                    if (payload && payload.exp && nowSecs < payload.exp) {
+                        this.idToken = savedIdToken;
+                        this.user.email = payload.email;
+                        this.user.name = payload.name;
+                        this.user.picture = payload.picture || '';
+                        
+                        onStatusChange('logging-in');
+                        this.initializeDatabase(onStatusChange, onError);
+                        
+                        // Render Google Sign-in button over login placeholder if visible
+                        const btn = document.getElementById("btn-login");
+                        if (btn) {
+                            google.accounts.id.renderButton(
+                                btn,
+                                { theme: "filled_blue", size: "large", width: 280 }
+                            );
+                        }
+                        return;
+                    }
+                }
+                
+                // If Apps Script is configured but ID token is missing/expired, force login
+                this.accessToken = null;
+                localStorage.removeItem('bsf_access_token');
+                localStorage.removeItem('bsf_token_expiry');
+                onStatusChange('logged-out');
+                return;
+            }
+
+            // Normal OAuth2 access token login (No Apps Script URL)
             const savedToken = localStorage.getItem('bsf_access_token');
             const expiry = localStorage.getItem('bsf_token_expiry');
             
