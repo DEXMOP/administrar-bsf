@@ -207,6 +207,14 @@ const GoogleAPI = {
      */
     async initializeDatabase(onStatusChange, onError) {
         try {
+            if (this.config.appsScriptUrl) {
+                // If Web App backend is configured, we bypass GAPI client calls entirely
+                onStatusChange('checking-permissions');
+                await this.determineUserRole(onError);
+                onStatusChange('connected');
+                return;
+            }
+
             // 1. Get spreadsheet details to see which sheets exist
             const spreadsheet = await gapi.client.sheets.spreadsheets.get({
                 spreadsheetId: this.config.spreadsheetId
@@ -234,12 +242,12 @@ const GoogleAPI = {
                     if (sheetName === 'Usuarios') headers = [['Email', 'Nombre', 'Rol']];
                     else if (sheetName === 'Reportes') headers = [['ID_Reporte', 'Fecha_Hora', 'Descripcion', 'Fotos_IDs', 'Categoria', 'Usuario']];
                     else if (sheetName === 'Finanzas') headers = [['ID_Transaccion', 'ID_Reporte', 'Fecha', 'Tipo', 'Categoria', 'Monto', 'Descripcion']];
-                    else if (sheetName === 'Insumos') headers = [['ID_Movimiento', 'ID_Reporte', 'Fecha', 'Insumo', 'Accion', 'Cantidad', 'Unidad', 'Costo_Total', 'Categoria']];
+                    else if (sheetName === 'Insumos') headers = [['ID_Movimiento', 'ID_Reporte', 'Fecha', 'Insumo', 'Accion', 'Cantidad', 'Unidad', 'Costo_Total', 'Categoria', 'Tamaño']];
                     else if (sheetName === 'Camas') headers = [['ID_Cama', 'Nombre', 'Tipo_Tamano', 'Estado', 'Grupo']];
                     else if (sheetName === 'Registro_Alimentacion') headers = [['ID_Alimentacion', 'ID_Cama', 'Fecha_Hora', 'Orden', 'Insumo', 'Cantidad', 'Usuario', 'Observaciones']];
                     else if (sheetName === 'Registro_Etapas') headers = [['ID_Cambio', 'ID_Tina', 'Fecha_Hora', 'Etapa_Anterior', 'Etapa_Nueva', 'Observacion', 'Usuario']];
                     else if (sheetName === 'Registro_Eliminados') headers = [['ID_Eliminacion', 'Tipo_Registro', 'ID_Original', 'Fecha_Hora_Original', 'Contenido_Original', 'Fecha_Hora_Eliminacion', 'Usuario', 'Motivo']];
-                    else if (sheetName === 'Maquinaria') headers = [['ID_Equipo', 'Nombre', 'Fecha_Adquisicion', 'Costo', 'Estado', 'Descripcion']];
+                    else if (sheetName === 'Maquinaria') headers = [['ID_Equipo', 'Nombre', 'Fecha_Adquisicion', 'Costo', 'Estado', 'Descripcion', 'Cantidad', 'Tamaño']];
 
                     await gapi.client.sheets.spreadsheets.values.update({
                         spreadsheetId: this.config.spreadsheetId,
@@ -256,14 +264,15 @@ const GoogleAPI = {
                 { name: 'Registro_Alimentacion', expected: ['ID_Alimentacion', 'ID_Cama', 'Fecha_Hora', 'Orden', 'Insumo', 'Cantidad', 'Usuario', 'Observaciones'] },
                 { name: 'Registro_Etapas', expected: ['ID_Cambio', 'ID_Tina', 'Fecha_Hora', 'Etapa_Anterior', 'Etapa_Nueva', 'Observacion', 'Usuario'] },
                 { name: 'Registro_Eliminados', expected: ['ID_Eliminacion', 'Tipo_Registro', 'ID_Original', 'Fecha_Hora_Original', 'Contenido_Original', 'Fecha_Hora_Eliminacion', 'Usuario', 'Motivo'] },
-                { name: 'Insumos', expected: ['ID_Movimiento', 'ID_Reporte', 'Fecha', 'Insumo', 'Accion', 'Cantidad', 'Unidad', 'Costo_Total', 'Categoria'] }
+                { name: 'Insumos', expected: ['ID_Movimiento', 'ID_Reporte', 'Fecha', 'Insumo', 'Accion', 'Cantidad', 'Unidad', 'Costo_Total', 'Categoria', 'Tamaño'] },
+                { name: 'Maquinaria', expected: ['ID_Equipo', 'Nombre', 'Fecha_Adquisicion', 'Costo', 'Estado', 'Descripcion', 'Cantidad', 'Tamaño'] }
             ];
 
             for (const item of sheetsToCheck) {
                 try {
                     const res = await gapi.client.sheets.spreadsheets.values.get({
                         spreadsheetId: this.config.spreadsheetId,
-                        range: `${item.name}!A1:I1`
+                        range: `${item.name}!A1:J1`
                     });
                     const currentHeaders = res.result.values ? res.result.values[0] : [];
                     
@@ -305,6 +314,30 @@ const GoogleAPI = {
      */
     async determineUserRole(onError) {
         try {
+            if (this.config.appsScriptUrl) {
+                const url = this.config.appsScriptUrl;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'determineUserRole',
+                        spreadsheetId: this.config.spreadsheetId,
+                        email: this.user.email,
+                        name: this.user.name
+                    })
+                });
+                if (!response.ok) {
+                    throw new Error(`Error de red en Apps Script Web App: ${response.statusText}`);
+                }
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error || "Error indeterminado al validar rol");
+                }
+                this.user.role = result.role;
+                return;
+            }
+
             const resp = await gapi.client.sheets.spreadsheets.values.get({
                 spreadsheetId: this.config.spreadsheetId,
                 range: 'Usuarios!A:C'
@@ -384,6 +417,30 @@ const GoogleAPI = {
      * Upload an image file to Drive folder
      */
     async uploadImageToDrive(file) {
+        if (this.config.appsScriptUrl) {
+            const base64Data = await this.fileToBase64(file);
+            const response = await fetch(this.config.appsScriptUrl, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'uploadImage',
+                    base64Data: base64Data,
+                    fileName: `${Date.now()}_${file.name}`,
+                    mimeType: file.type,
+                    folderId: this.config.driveFolderId
+                })
+            });
+            if (!response.ok) {
+                throw new Error(`Error de red al subir imagen por Apps Script: ${response.statusText}`);
+            }
+            const result = await response.json();
+            if (!result.success) {
+                throw new Error(result.error || "Error al subir imagen mediante el script");
+            }
+            return result.fileId;
+        }
+
         const metadata = {
             name: `${Date.now()}_${file.name}`,
             mimeType: file.type,
@@ -456,6 +513,19 @@ const GoogleAPI = {
      * Generic sheets data fetching
      */
     async getSheetData(range) {
+        if (this.config.appsScriptUrl) {
+            const url = `${this.config.appsScriptUrl}?action=read&spreadsheetId=${encodeURIComponent(this.config.spreadsheetId)}&range=${encodeURIComponent(range)}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Error al leer datos por Apps Script: ${response.statusText}`);
+            }
+            const result = await response.json();
+            if (!result.success) {
+                throw new Error(result.error || "Error al leer datos mediante el script");
+            }
+            return result.values || [];
+        }
+
         const response = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: this.config.spreadsheetId,
             range: range
@@ -467,6 +537,28 @@ const GoogleAPI = {
      * Generic sheets data appending
      */
     async appendSheetData(range, values) {
+        if (this.config.appsScriptUrl) {
+            const response = await fetch(this.config.appsScriptUrl, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'append',
+                    spreadsheetId: this.config.spreadsheetId,
+                    range: range,
+                    values: values
+                })
+            });
+            if (!response.ok) {
+                throw new Error(`Error al agregar datos por Apps Script: ${response.statusText}`);
+            }
+            const result = await response.json();
+            if (!result.success) {
+                throw new Error(result.error || "Error al agregar datos mediante el script");
+            }
+            return result;
+        }
+
         const response = await gapi.client.sheets.spreadsheets.values.append({
             spreadsheetId: this.config.spreadsheetId,
             range: range,
@@ -480,6 +572,28 @@ const GoogleAPI = {
      * Generic sheets row updates
      */
     async updateSheetRow(range, values) {
+        if (this.config.appsScriptUrl) {
+            const response = await fetch(this.config.appsScriptUrl, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'update',
+                    spreadsheetId: this.config.spreadsheetId,
+                    range: range,
+                    values: values
+                })
+            });
+            if (!response.ok) {
+                throw new Error(`Error al actualizar datos por Apps Script: ${response.statusText}`);
+            }
+            const result = await response.json();
+            if (!result.success) {
+                throw new Error(result.error || "Error al actualizar datos mediante el script");
+            }
+            return result;
+        }
+
         const response = await gapi.client.sheets.spreadsheets.values.update({
             spreadsheetId: this.config.spreadsheetId,
             range: range,
@@ -493,6 +607,27 @@ const GoogleAPI = {
      * Generic sheets row deletion (by clearing values)
      */
     async clearSheetRange(range) {
+        if (this.config.appsScriptUrl) {
+            const response = await fetch(this.config.appsScriptUrl, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'clear',
+                    spreadsheetId: this.config.spreadsheetId,
+                    range: range
+                })
+            });
+            if (!response.ok) {
+                throw new Error(`Error al borrar datos por Apps Script: ${response.statusText}`);
+            }
+            const result = await response.json();
+            if (!result.success) {
+                throw new Error(result.error || "Error al borrar datos mediante el script");
+            }
+            return result;
+        }
+
         const response = await gapi.client.sheets.spreadsheets.values.clear({
             spreadsheetId: this.config.spreadsheetId,
             range: range
@@ -747,13 +882,13 @@ const GoogleAPI = {
      * Get all Machinery
      */
     async getMaquinaria() {
-        return await this.getSheetData('Maquinaria!A:F');
+        return await this.getSheetData('Maquinaria!A:H');
     },
 
     /**
      * Add new machinery and log optional automatic finance expense
      */
-    async addMaquinaria(nombre, fecha, costo, estado, desc) {
+    async addMaquinaria(nombre, fecha, costo, estado, desc, cantidad, tamano) {
         const idEquipo = `EQP-${Date.now()}`;
         const row = [
             idEquipo,
@@ -761,10 +896,12 @@ const GoogleAPI = {
             fecha,
             costo.toString(),
             estado,
-            desc || ''
+            desc || '',
+            (cantidad || 1).toString(),
+            tamano || ''
         ];
         
-        await this.appendSheetData('Maquinaria!A:F', [row]);
+        await this.appendSheetData('Maquinaria!A:H', [row]);
         
         // Auto-log expense if cost > 0
         const parsedCost = parseFloat(costo) || 0;
@@ -802,11 +939,7 @@ const GoogleAPI = {
      */
     async getUsuarios() {
         try {
-            const resp = await gapi.client.sheets.spreadsheets.values.get({
-                spreadsheetId: this.config.spreadsheetId,
-                range: 'Usuarios!A:C'
-            });
-            return resp.result.values || [];
+            return await this.getSheetData('Usuarios!A:C');
         } catch (err) {
             console.error("Failed to fetch users", err);
             return [];

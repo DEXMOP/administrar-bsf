@@ -138,6 +138,11 @@ const Components = {
                         <label class="form-label" for="setup-folder-id">Google Drive Folder ID (Opcional)</label>
                         <input type="text" id="setup-folder-id" class="form-control" placeholder="Dejar en blanco para crear una nueva carpeta automáticamente">
                     </div>
+                    <div class="form-group">
+                        <label class="form-label" for="setup-script-url">Google Apps Script Web App URL (Opcional - Arquitectura Segura)</label>
+                        <input type="text" id="setup-script-url" class="form-control" placeholder="https://script.google.com/macros/s/XXXXX/exec">
+                        <small class="form-text text-secondary">Si se configura, la app utilizará esta API de forma segura y los operarios no requerirán acceso directo al Excel.</small>
+                    </div>
                     <button type="submit" id="btn-save-setup" class="btn btn-primary btn-block mt-3">
                         <i class="fa-solid fa-floppy-disk"></i> Guardar y Conectar
                     </button>
@@ -151,6 +156,7 @@ const Components = {
             document.getElementById('setup-client-id').value = GoogleAPI.config.clientId || '';
             document.getElementById('setup-sheet-id').value = GoogleAPI.config.spreadsheetId || '';
             document.getElementById('setup-folder-id').value = GoogleAPI.config.driveFolderId || '';
+            document.getElementById('setup-script-url').value = GoogleAPI.config.appsScriptUrl || '';
         }
 
         document.getElementById('setup-form').addEventListener('submit', (e) => {
@@ -159,7 +165,8 @@ const Components = {
                 apiKey: document.getElementById('setup-api-key').value.trim(),
                 clientId: document.getElementById('setup-client-id').value.trim(),
                 spreadsheetId: document.getElementById('setup-sheet-id').value.trim(),
-                driveFolderId: document.getElementById('setup-folder-id').value.trim() || null
+                driveFolderId: document.getElementById('setup-folder-id').value.trim() || null,
+                appsScriptUrl: document.getElementById('setup-script-url').value.trim() || null
             };
             onSaveCallback(config);
         });
@@ -803,14 +810,15 @@ const Components = {
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="supply-unit">Unidad de Medida</label>
-                                <select id="supply-unit" class="form-control" required>
+                                <input type="text" id="supply-unit" class="form-control" list="supply-units-list" value="kg" placeholder="Ej: kg, sacos, etc" required>
+                                <datalist id="supply-units-list">
                                     <option value="kg">Kilogramos (kg)</option>
                                     <option value="baldes">Baldes (restos de fruta)</option>
                                     <option value="sacos">Sacos (aserrín/salvado)</option>
                                     <option value="L">Litros (L)</option>
                                     <option value="unidades">Unidades (unids)</option>
                                     <option value="g">Gramos (g)</option>
-                                </select>
+                                </datalist>
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="supply-date">Fecha del Movimiento</label>
@@ -828,12 +836,17 @@ const Components = {
                                 ${this.renderTinaSelection(camas, 'supply')}
                             </div>
                         </div>
-
-                        <div class="form-group">
-                            <label class="form-label" for="supply-cost">Costo Total ($) (Opcional si es compra recién ingresada)</label>
-                            <input type="number" id="supply-cost" class="form-control" placeholder="Dejar vacío si no costó dinero" step="0.01" min="0">
-                            ${this.renderQuickQtyButtons('supply-cost', true)}
-                        </div>
+                        <div class="form-row-2">
+                             <div class="form-group">
+                                 <label class="form-label" for="supply-size">Tamaño / Presentación (Opcional)</label>
+                                 <input type="text" id="supply-size" class="form-control" placeholder="Ej: Saco de 45kg, Botella 1L, Mediano">
+                             </div>
+                             <div class="form-group">
+                                 <label class="form-label" for="supply-cost">Costo Total ($) (Opcional si es compra recién ingresada)</label>
+                                 <input type="number" id="supply-cost" class="form-control" placeholder="Dejar vacío si no costó dinero" step="0.01" min="0">
+                                 ${this.renderQuickQtyButtons('supply-cost', true)}
+                             </div>
+                         </div>
 
                         <div class="form-group">
                             <label class="form-label">¿Quiénes colaboraron en esta tarea hoy?</label>
@@ -852,16 +865,26 @@ const Components = {
                     <p class="mb-3">Registra una nueva herramienta, equipo o máquina para el criadero. Si tiene un costo, se auto-generará un egreso en contabilidad.</p>
                     
                     <form id="add-machinery-form">
-                        <div class="form-row-2">
-                            <div class="form-group">
-                                <label class="form-label" for="machinery-name">Nombre de la Máquina / Herramienta</label>
-                                <input type="text" id="machinery-name" class="form-control" placeholder="Ej: Trituradora de fruta, Balanza digital, etc" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label" for="machinery-date">Fecha de Compra</label>
-                                <input type="date" id="machinery-date" class="form-control" value="${todayStr}" required>
-                            </div>
-                        </div>
+                         <div class="form-row-2">
+                             <div class="form-group">
+                                 <label class="form-label" for="machinery-name">Nombre de la Máquina / Herramienta</label>
+                                 <input type="text" id="machinery-name" class="form-control" placeholder="Ej: Trituradora de fruta, Balanza digital, etc" required>
+                             </div>
+                             <div class="form-group">
+                                 <label class="form-label" for="machinery-date">Fecha de Compra</label>
+                                 <input type="date" id="machinery-date" class="form-control" value="${todayStr}" required>
+                             </div>
+                         </div>
+                         <div class="form-row-2">
+                             <div class="form-group">
+                                 <label class="form-label" for="machinery-qty">Cantidad</label>
+                                 <input type="number" id="machinery-qty" class="form-control" value="1" min="1" step="1" required>
+                             </div>
+                             <div class="form-group">
+                                 <label class="form-label" for="machinery-size">Tamaño / Capacidad (Opcional)</label>
+                                 <input type="text" id="machinery-size" class="form-control" placeholder="Ej: Grande, 20L, Mediano">
+                             </div>
+                         </div>
                         <div class="form-row-2">
                             <div class="form-group">
                                 <label class="form-label" for="machinery-cost">Precio de Compra ($)</label>
@@ -1108,48 +1131,24 @@ const Components = {
         });
 
         // Dynamic Quick Qty Button Label updates based on selected unit
-        const reportFeedUnit = document.getElementById('report-feed-unit');
-        const updateReportFeedQtyLabels = () => {
-            if (!reportFeedUnit) return;
-            const unit = reportFeedUnit.value;
-            const getUnitLabel = (delta) => {
-                const absDelta = Math.abs(delta);
-                if (unit === 'baldes') return absDelta === 1 ? 'balde' : 'baldes';
-                if (unit === 'sacos') return absDelta === 1 ? 'saco' : 'sacos';
-                return unit;
+        const updateDynamicUnitLabels = (inputUnitId, inputQtyId) => {
+            const inputUnit = document.getElementById(inputUnitId);
+            if (!inputUnit) return;
+            const updateLabels = () => {
+                const unit = inputUnit.value;
+                container.querySelectorAll(`.quick-qty-btn[data-input="${inputQtyId}"]`).forEach(btn => {
+                    const delta = parseFloat(btn.getAttribute('data-delta'));
+                    const prefix = delta > 0 ? `+${delta}` : `${delta}`;
+                    btn.textContent = `${prefix} ${unit}`;
+                });
             };
-            container.querySelectorAll(`.quick-qty-btn[data-input="report-feed-qty"]`).forEach(btn => {
-                const delta = parseFloat(btn.getAttribute('data-delta'));
-                const prefix = delta > 0 ? `+${delta}` : `${delta}`;
-                btn.textContent = `${prefix} ${getUnitLabel(delta)}`;
-            });
+            inputUnit.addEventListener('input', updateLabels);
+            inputUnit.addEventListener('change', updateLabels);
+            updateLabels();
         };
-        if (reportFeedUnit) {
-            reportFeedUnit.addEventListener('change', updateReportFeedQtyLabels);
-            updateReportFeedQtyLabels();
-        }
 
-        const supplyUnitSelect = document.getElementById('supply-unit');
-        const updateSupplyQtyLabels = () => {
-            if (!supplyUnitSelect) return;
-            const unit = supplyUnitSelect.value;
-            const getUnitLabel = (delta) => {
-                const absDelta = Math.abs(delta);
-                if (unit === 'baldes') return absDelta === 1 ? 'balde' : 'baldes';
-                if (unit === 'sacos') return absDelta === 1 ? 'saco' : 'sacos';
-                if (unit === 'unidades') return absDelta === 1 ? 'unid' : 'unids';
-                return unit;
-            };
-            container.querySelectorAll(`.quick-qty-btn[data-input="supply-qty"]`).forEach(btn => {
-                const delta = parseFloat(btn.getAttribute('data-delta'));
-                const prefix = delta > 0 ? `+${delta}` : `${delta}`;
-                btn.textContent = `${prefix} ${getUnitLabel(delta)}`;
-            });
-        };
-        if (supplyUnitSelect) {
-            supplyUnitSelect.addEventListener('change', updateSupplyQtyLabels);
-            updateSupplyQtyLabels();
-        }
+        updateDynamicUnitLabels('report-feed-unit', 'report-feed-qty');
+        updateDynamicUnitLabels('supply-unit', 'supply-qty');
 
         // Report category dynamic feeding section toggle
         const reportCategory = document.getElementById('report-category');
@@ -1183,6 +1182,51 @@ const Components = {
             }
         });
 
+        // Auto-save and Restore draft for report
+        const restoreReportDraft = () => {
+            const draftStr = localStorage.getItem('bsf_report_draft');
+            if (!draftStr) return;
+            try {
+                const draft = JSON.parse(draftStr);
+                if (draft.category) document.getElementById('report-category').value = draft.category;
+                if (draft.date) document.getElementById('report-date').value = draft.date;
+                if (draft.desc) document.getElementById('report-desc').value = draft.desc;
+                if (draft.feedInsumo) document.getElementById('report-feed-insumo').value = draft.feedInsumo;
+                if (draft.feedQty) document.getElementById('report-feed-qty').value = draft.feedQty;
+                if (draft.feedUnit) document.getElementById('report-feed-unit').value = draft.feedUnit;
+
+                // Trigger events to restore UI dynamically
+                document.getElementById('report-category').dispatchEvent(new Event('change'));
+                const feedUnitInput = document.getElementById('report-feed-unit');
+                if (feedUnitInput) {
+                    feedUnitInput.dispatchEvent(new Event('change'));
+                }
+            } catch (err) {
+                console.error("Fallo al restaurar borrador", err);
+            }
+        };
+
+        const saveReportDraft = () => {
+            const draft = {
+                category: document.getElementById('report-category')?.value || '',
+                date: document.getElementById('report-date')?.value || '',
+                desc: document.getElementById('report-desc')?.value || '',
+                feedInsumo: document.getElementById('report-feed-insumo')?.value || '',
+                feedQty: document.getElementById('report-feed-qty')?.value || '',
+                feedUnit: document.getElementById('report-feed-unit')?.value || ''
+            };
+            localStorage.setItem('bsf_report_draft', JSON.stringify(draft));
+        };
+
+        const form = document.getElementById('add-report-form');
+        if (form) {
+            form.querySelectorAll('input, textarea, select').forEach(input => {
+                input.addEventListener('input', saveReportDraft);
+                input.addEventListener('change', saveReportDraft);
+            });
+            restoreReportDraft();
+        }
+
         // FORM SUBMIT 1: BITÁCORA / REPORT & PHOTOS
         document.getElementById('add-report-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1214,15 +1258,49 @@ const Components = {
                     alert("Por favor, ingresa una cantidad válida mayor a 0.");
                     return;
                 }
+
+                // Stock validation check for Alimentación
+                showLoading("Verificando stock disponible...");
+                try {
+                    const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
+                    let currentStock = 0;
+                    let unit = '';
+                    supplyRows.slice(1).forEach(row => {
+                        const name = row[3] ? row[3].trim().toLowerCase() : '';
+                        if (name === insumo.toLowerCase()) {
+                            const act = row[4];
+                            const qty = parseFloat(row[5]) || 0;
+                            unit = row[6] || 'kg';
+                            if (act === 'Adición') currentStock += qty;
+                            else if (act === 'Utilización') currentStock -= qty;
+                        }
+                    });
+
+                    if (totalQty > currentStock) {
+                        hideLoading();
+                        alert(`Error: No hay suficiente stock en bodega para alimentar.\nStock actual de "${insumo}": ${currentStock.toFixed(2)} ${unit}.\nCantidad solicitada: ${totalQty.toFixed(2)} ${unit}.`);
+                        return;
+                    }
+                } catch (stockErr) {
+                    console.warn("Fallo al verificar stock", stockErr);
+                }
             }
 
             showLoading("Subiendo fotos y registrando bitácora...");
 
             try {
-                // 1. Upload files to Google Drive in parallel
+                // 1. Compress and Upload files to Google Drive
                 const photoIds = [];
                 for (const file of this.selectedFiles) {
-                    const driveId = await GoogleAPI.uploadImageToDrive(file);
+                    let fileToUpload = file;
+                    try {
+                        showLoading(`Optimizando foto: ${file.name}...`);
+                        fileToUpload = await this.compressImage(file);
+                    } catch (compressErr) {
+                        console.warn("Fallo al comprimir, subiendo original", compressErr);
+                    }
+                    showLoading(`Subiendo foto: ${file.name}...`);
+                    const driveId = await GoogleAPI.uploadImageToDrive(fileToUpload);
                     photoIds.push(driveId);
                 }
 
@@ -1289,9 +1367,10 @@ const Components = {
                         totalQty,
                         feedUnit,
                         0,
-                        'Sustrato' // Category is Sustrato
+                        'Sustrato', // Category is Sustrato
+                        '' // Tamaño
                     ]];
-                    await GoogleAPI.appendSheetData('Insumos!A:I', supplyValues);
+                    await GoogleAPI.appendSheetData('Insumos!A:J', supplyValues);
                 }
 
                 await GoogleAPI.appendSheetData('Reportes!A:F', reportValues);
@@ -1303,6 +1382,7 @@ const Components = {
                 document.getElementById('add-report-form').reset();
                 this.selectedFiles = [];
                 previewContainer.innerHTML = '';
+                localStorage.removeItem('bsf_report_draft');
                 
                 // Hide dynamic area again if category changes
                 feedingReportDetails.classList.add('hidden');
@@ -1400,6 +1480,32 @@ const Components = {
                 const supplyUnit = document.getElementById('supply-unit').value;
                 const supplyDate = document.getElementById('supply-date').value;
                 const supplyCost = parseFloat(document.getElementById('supply-cost').value) || 0;
+                const supplySize = document.getElementById('supply-size').value;
+
+                // Validation to prevent negative stock on Utilización
+                if (supplyAction === 'Utilización') {
+                    showLoading("Verificando stock disponible en bodega...");
+                    const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
+                    let currentStock = 0;
+                    let unit = '';
+                    supplyRows.slice(1).forEach(row => {
+                        const name = row[3] ? row[3].trim().toLowerCase() : '';
+                        if (name === supplyName.toLowerCase()) {
+                            const act = row[4];
+                            const qty = parseFloat(row[5]) || 0;
+                            unit = row[6] || 'kg';
+                            if (act === 'Adición') currentStock += qty;
+                            else if (act === 'Utilización') currentStock -= qty;
+                        }
+                    });
+
+                    if (supplyQty > currentStock) {
+                        hideLoading();
+                        alert(`Error: No hay suficiente stock en bodega para esta utilización.\nStock actual de "${supplyName}": ${currentStock.toFixed(2)} ${unit}.\nCantidad solicitada: ${supplyQty.toFixed(2)} ${unit}.`);
+                        return;
+                    }
+                    showLoading("Registrando movimiento de bodega...");
+                }
 
                 // Collaborators metadata
                 const selectedCollabs = Array.from(container.querySelectorAll('input.supply-collab-chk:checked')).map(cb => cb.value);
@@ -1417,7 +1523,8 @@ const Components = {
                     supplyQty,
                     supplyUnit,
                     supplyCost,
-                    supplyCategory
+                    supplyCategory,
+                    supplySize
                 ]];
 
                 // If Action is Utilización and N > 0 tinas selected, write feeding logs
@@ -1450,7 +1557,7 @@ const Components = {
                     await GoogleAPI.appendFeedingLogsBatch(feedingRows);
                 }
 
-                await GoogleAPI.appendSheetData('Insumos!A:I', supplyValues);
+                await GoogleAPI.appendSheetData('Insumos!A:J', supplyValues);
 
                 // If supply has cost, auto-generate a financial record of Gasto
                 if (supplyCost > 0) {
@@ -1462,7 +1569,7 @@ const Components = {
                         'Gasto',
                         'Operativo: Compra de Insumos',
                         supplyCost,
-                        `${collabMeta}Compra auto-registrada de ${supplyQty} ${supplyUnit} de ${supplyName}`
+                        `${collabMeta}Compra auto-registrada de ${supplyQty} ${supplyUnit} de ${supplyName} (${supplySize})`
                     ]];
                     await GoogleAPI.appendSheetData('Finanzas!A:G', financeValues);
                 }
@@ -1505,6 +1612,8 @@ const Components = {
                     const date = document.getElementById('machinery-date').value;
                     const cost = parseFloat(document.getElementById('machinery-cost').value) || 0;
                     const status = document.getElementById('machinery-status').value;
+                    const qty = document.getElementById('machinery-qty').value;
+                    const size = document.getElementById('machinery-size').value;
 
                     // Collaborators metadata
                     const selectedCollabs = Array.from(container.querySelectorAll('input.machinery-collab-chk:checked')).map(cb => cb.value);
@@ -1513,15 +1622,16 @@ const Components = {
                         collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
                     }
 
-                    const desc = collabMeta + document.getElementById('machinery-desc').value.trim();
+                    const desc = `${collabMeta} Cant: ${qty}, Tamaño: ${size} | ${document.getElementById('machinery-desc').value.trim()}`;
 
-                    await GoogleAPI.addMaquinaria(name, date, cost, status, desc);
+                    await GoogleAPI.addMaquinaria(name, date, cost, status, desc, qty, size);
 
                     hideLoading();
                     alert("¡Herramienta/Equipo registrado con éxito!");
 
                     // Reset
                     addMachineryForm.reset();
+                    document.getElementById('machinery-qty').value = '1';
                     document.getElementById('machinery-date').value = todayStr;
                     container.querySelectorAll('.collab-select-card[data-prefix="machinery"]').forEach(c => c.classList.remove('selected'));
 
@@ -1596,6 +1706,60 @@ const Components = {
     },
 
     /**
+     * Compress an image file using HTML5 Canvas
+     */
+    compressImage(file, maxWidth = 1280, maxHeight = 720, quality = 0.75) {
+        return new Promise((resolve, reject) => {
+            if (!file.type.startsWith('image/')) {
+                resolve(file);
+                return;
+            }
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height *= maxWidth / width;
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width *= maxHeight / height;
+                            height = maxHeight;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob((blob) => {
+                        if (!blob) {
+                            reject(new Error("Canvas compression failed"));
+                            return;
+                        }
+                        const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        resolve(compressedFile);
+                    }, 'image/jpeg', quality);
+                };
+                img.onerror = (err) => reject(err);
+            };
+            reader.onerror = (err) => reject(err);
+        });
+    },
+
+    /**
      * File selection helper to add files and generate preview
      */
     handleFileSelection(files, previewContainer) {
@@ -1642,7 +1806,7 @@ const Components = {
         try {
             const reportRows = await GoogleAPI.getSheetData('Reportes!A:F');
             const financeRows = await GoogleAPI.getSheetData('Finanzas!A:G');
-            const supplyRows = await GoogleAPI.getSheetData('Insumos!A:H');
+            const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
 
             const reports = reportRows.slice(1);
             const finances = financeRows.slice(1);
@@ -1735,7 +1899,7 @@ const Components = {
                                         ${relatedSupply ? `
                                             <div class="timeline-extra-item">
                                                 <i class="fa-solid fa-boxes-stacked text-warning"></i>
-                                                <span>${relatedSupply[4]} Insumo: <strong>${relatedSupply[3]}</strong> (${parseFloat(relatedSupply[5])} ${relatedSupply[6]})</span>
+                                                <span>${relatedSupply[4]} Insumo: <strong>${relatedSupply[3]}</strong> (${parseFloat(relatedSupply[5])} ${relatedSupply[6]}${relatedSupply[9] ? ` - Presentación: ${relatedSupply[9]}` : ''})</span>
                                             </div>
                                         ` : ''}
                                     </div>
@@ -1767,7 +1931,7 @@ const Components = {
                             // 1. Fetch data from sheets to find original content
                             const reportRows = await GoogleAPI.getSheetData('Reportes!A:F');
                             const financeRows = await GoogleAPI.getSheetData('Finanzas!A:G');
-                            const supplyRows = await GoogleAPI.getSheetData('Insumos!A:H');
+                            const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
                             const feedingRows = await GoogleAPI.getSheetData('Registro_Alimentacion!A:H');
 
                             // Find report row index
@@ -1809,7 +1973,7 @@ const Components = {
                                 await GoogleAPI.logDeletion('Insumos', supRow[0], supRow[2], supDetail, reason);
                                 
                                 // Clear supply row from Sheet
-                                await GoogleAPI.clearSheetRange(`Insumos!A${supIdx + 1}:H${supIdx + 1}`);
+                                await GoogleAPI.clearSheetRange(`Insumos!A${supIdx + 1}:J${supIdx + 1}`);
                                 
                                 // Remove from local memory
                                 supplyRows[supIdx] = [];
@@ -2040,7 +2204,7 @@ const Components = {
         container.innerHTML = `<div class="text-center py-5"><div class="bio-spinner"></div><p>Cargando inventario y activos...</p></div>`;
 
         try {
-            const supplyRows = await GoogleAPI.getSheetData('Insumos!A:I');
+            const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
             const machineryRows = await GoogleAPI.getMaquinaria();
 
             const supplies = supplyRows.slice(1).filter(row => row[0]);
@@ -2235,6 +2399,8 @@ const Components = {
                                             const cost = parseFloat(m[3]) || 0;
                                             const status = m[4];
                                             const desc = m[5] || '';
+                                            const cantidad = m[6] || '1';
+                                            const tamano = m[7] || '';
 
                                             let statusClass = 'disponible';
                                             if (status === 'En Mantenimiento') statusClass = 'neonatos';
@@ -2249,7 +2415,8 @@ const Components = {
                                                         </div>
                                                         <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;" class="mb-0">
                                                             Adquisición: <strong>${date}</strong><br>
-                                                            Inversión: <strong class="text-success">$${cost.toFixed(2)}</strong>
+                                                            Inversión: <strong class="text-success">$${cost.toFixed(2)}</strong><br>
+                                                            Cantidad: <strong>${cantidad}</strong>${tamano ? `<br>Tamaño/Capacidad: <strong>${tamano}</strong>` : ''}
                                                         </p>
                                                         ${desc ? `<p style="font-size: 0.8rem; color: var(--text-warning); font-style: italic; margin-top: 0.5rem; line-height: 1.25;" class="mb-0"><i class="fa-solid fa-info-circle"></i> ${desc}</p>` : ''}
                                                     </div>
@@ -2305,15 +2472,20 @@ const Components = {
                                         </div>
                                         <div class="form-group">
                                             <label class="form-label" for="m-supply-unit">Unidad</label>
-                                            <select id="m-supply-unit" class="form-control">
-                                                <option value="kg">kg</option>
-                                                <option value="baldes">baldes</option>
-                                                <option value="sacos">sacos</option>
-                                                <option value="L">Litros (L)</option>
-                                                <option value="unidades">Unidades</option>
-                                                <option value="g">gramos (g)</option>
-                                            </select>
+                                            <input type="text" id="m-supply-unit" class="form-control" list="m-supply-units-list" value="kg" required>
+                                            <datalist id="m-supply-units-list">
+                                                <option value="kg">
+                                                <option value="baldes">
+                                                <option value="sacos">
+                                                <option value="L">
+                                                <option value="unidades">
+                                                <option value="g">
+                                            </datalist>
                                         </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label" for="m-supply-size">Tamaño / Presentación (Opcional)</label>
+                                        <input type="text" id="m-supply-size" class="form-control" placeholder="Ej: Saco 40kg, Balde Grande">
                                     </div>
                                     <div class="modal-footer" style="padding-right: 0; padding-bottom: 0; border: none;">
                                         <button type="button" id="btn-modal-cancel" class="btn btn-secondary">Cancelar</button>
@@ -2390,6 +2562,7 @@ const Components = {
                         const mAction = document.getElementById('m-supply-action').value;
                         const mQty = parseFloat(document.getElementById('m-supply-qty').value);
                         const mUnit = document.getElementById('m-supply-unit').value;
+                        const mSize = document.getElementById('m-supply-size').value.trim();
 
                         const rowValues = [[
                             `SUP_${Date.now()}`,
@@ -2400,10 +2573,11 @@ const Components = {
                             mQty,
                             mUnit,
                             0,
-                            mCategory
+                            mCategory,
+                            mSize
                         ]];
 
-                        await GoogleAPI.appendSheetData('Insumos!A:I', rowValues);
+                        await GoogleAPI.appendSheetData('Insumos!A:J', rowValues);
                         modal.classList.add('hidden');
                         hideLoading();
                         alert("Movimiento de inventario guardado.");
