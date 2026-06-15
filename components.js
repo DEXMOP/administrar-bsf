@@ -649,7 +649,7 @@ const Components = {
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="report-date">Fecha de la Tarea</label>
-                                <input type="date" id="report-date" class="form-control" value="${todayStr}" required>
+                                <input type="date" id="report-date" class="form-control" value="${todayStr}" required ${GoogleAPI.user.role !== 'Administrador' ? 'disabled' : ''}>
                             </div>
                         </div>
 
@@ -754,7 +754,7 @@ const Components = {
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="finance-date">Fecha del Pago</label>
-                                <input type="date" id="finance-date" class="form-control" value="${todayStr}" required>
+                                <input type="date" id="finance-date" class="form-control" value="${todayStr}" required ${GoogleAPI.user.role !== 'Administrador' ? 'disabled' : ''}>
                             </div>
                         </div>
                         <div class="form-group">
@@ -827,7 +827,7 @@ const Components = {
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="supply-date">Fecha del Movimiento</label>
-                                <input type="date" id="supply-date" class="form-control" value="${todayStr}" required>
+                                <input type="date" id="supply-date" class="form-control" value="${todayStr}" required ${GoogleAPI.user.role !== 'Administrador' ? 'disabled' : ''}>
                             </div>
                         </div>
                         <!-- DYNAMIC FEEDING AREA FOR SUPPLIES -->
@@ -877,7 +877,7 @@ const Components = {
                              </div>
                              <div class="form-group">
                                  <label class="form-label" for="machinery-date">Fecha de Compra</label>
-                                 <input type="date" id="machinery-date" class="form-control" value="${todayStr}" required>
+                                 <input type="date" id="machinery-date" class="form-control" value="${todayStr}" required ${GoogleAPI.user.role !== 'Administrador' ? 'disabled' : ''}>
                              </div>
                          </div>
                          <div class="form-row-2">
@@ -960,7 +960,7 @@ const Components = {
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="sale-date">Fecha de la Venta</label>
-                                <input type="date" id="sale-date" class="form-control" value="${todayStr}" required>
+                                <input type="date" id="sale-date" class="form-control" value="${todayStr}" required ${GoogleAPI.user.role !== 'Administrador' ? 'disabled' : ''}>
                             </div>
                         </div>
 
@@ -1322,7 +1322,17 @@ const Components = {
                     collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
                 }
 
-                const reportDesc = collabMeta + document.getElementById('report-desc').value;
+                const sysNow = new Date();
+                const sysOffset = sysNow.getTimezoneOffset();
+                const sysLocalNow = new Date(sysNow.getTime() - (sysOffset*60*1000));
+                const sysTodayStr = sysLocalNow.toISOString().substring(0, 10);
+                const sysDateTimeStr = sysLocalNow.toISOString().replace('T', ' ').substring(0, 19);
+
+                let reportDesc = collabMeta + document.getElementById('report-desc').value;
+                if (reportDateVal !== sysTodayStr) {
+                    reportDesc += ` \n[Ingreso al Sistema: ${sysDateTimeStr}]`;
+                }
+
                 const photosString = photoIds.join(',');
 
                 const reportValues = [[
@@ -1429,7 +1439,16 @@ const Components = {
                     collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
                 }
 
-                const finDesc = collabMeta + document.getElementById('finance-desc').value.trim();
+                const sysNow = new Date();
+                const sysOffset = sysNow.getTimezoneOffset();
+                const sysLocalNow = new Date(sysNow.getTime() - (sysOffset*60*1000));
+                const sysTodayStr = sysLocalNow.toISOString().substring(0, 10);
+                const sysDateTimeStr = sysLocalNow.toISOString().replace('T', ' ').substring(0, 19);
+
+                let finDesc = collabMeta + document.getElementById('finance-desc').value.trim();
+                if (finDate !== sysTodayStr) {
+                    finDesc += ` \n[Ingreso al Sistema: ${sysDateTimeStr}]`;
+                }
 
                 const financeValues = [[
                     finId,
@@ -1566,6 +1585,17 @@ const Components = {
 
                 // If supply has cost, auto-generate a financial record of Gasto
                 if (supplyCost > 0) {
+                    const sysNow = new Date();
+                    const sysOffset = sysNow.getTimezoneOffset();
+                    const sysLocalNow = new Date(sysNow.getTime() - (sysOffset*60*1000));
+                    const sysTodayStr = sysLocalNow.toISOString().substring(0, 10);
+                    const sysDateTimeStr = sysLocalNow.toISOString().replace('T', ' ').substring(0, 19);
+
+                    let finDesc = `${collabMeta}Compra auto-registrada de ${supplyQty} ${supplyUnit} de ${supplyName} (${supplySize})`;
+                    if (supplyDate !== sysTodayStr) {
+                        finDesc += ` \n[Ingreso al Sistema: ${sysDateTimeStr}]`;
+                    }
+
                     const finId = `FIN_${Date.now()}_SUP`;
                     const financeValues = [[
                         finId,
@@ -1574,7 +1604,7 @@ const Components = {
                         'Gasto',
                         'Operativo: Compra de Insumos',
                         supplyCost,
-                        `${collabMeta}Compra auto-registrada de ${supplyQty} ${supplyUnit} de ${supplyName} (${supplySize})`
+                        finDesc
                     ]];
                     await GoogleAPI.appendSheetData('Finanzas!A:G', financeValues);
                 }
@@ -1678,6 +1708,17 @@ const Components = {
                         collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
                     }
 
+                    const sysNow = new Date();
+                    const sysOffset = sysNow.getTimezoneOffset();
+                    const sysLocalNow = new Date(sysNow.getTime() - (sysOffset*60*1000));
+                    const sysTodayStr = sysLocalNow.toISOString().substring(0, 10);
+                    const sysDateTimeStr = sysLocalNow.toISOString().replace('T', ' ').substring(0, 19);
+
+                    let txDesc = `${collabMeta}Venta a ${client} (${qty} x $${price})`;
+                    if (date !== sysTodayStr) {
+                        txDesc += ` \n[Ingreso al Sistema: ${sysDateTimeStr}]`;
+                    }
+
                     const txRow = [
                         `TX_${Date.now()}_${Math.floor(Math.random()*1000)}`,
                         'MANUAL',
@@ -1685,7 +1726,7 @@ const Components = {
                         'Ingreso',
                         `Venta: ${product}`,
                         totalAmount.toString(),
-                        `${collabMeta}Venta a ${client} (${qty} x $${price})`
+                        txDesc
                     ];
 
                     await GoogleAPI.appendSheetData('Finanzas!A:G', [txRow]);

@@ -890,13 +890,25 @@ const GoogleAPI = {
      */
     async addMaquinaria(nombre, fecha, costo, estado, desc, cantidad, tamano) {
         const idEquipo = `EQP-${Date.now()}`;
+        
+        const sysNow = new Date();
+        const sysOffset = sysNow.getTimezoneOffset();
+        const sysLocalNow = new Date(sysNow.getTime() - (sysOffset*60*1000));
+        const sysTodayStr = sysLocalNow.toISOString().substring(0, 10);
+        const sysDateTimeStr = sysLocalNow.toISOString().replace('T', ' ').substring(0, 19);
+
+        let finalDesc = desc || '';
+        if (fecha !== sysTodayStr) {
+            finalDesc += ` \n[Ingreso al Sistema: ${sysDateTimeStr}]`;
+        }
+
         const row = [
             idEquipo,
             nombre,
             fecha,
             costo.toString(),
             estado,
-            desc || '',
+            finalDesc,
             (cantidad || 1).toString(),
             tamano || ''
         ];
@@ -906,6 +918,10 @@ const GoogleAPI = {
         // Auto-log expense if cost > 0
         const parsedCost = parseFloat(costo) || 0;
         if (parsedCost > 0) {
+            let txDesc = `Compra de activo: ${nombre}`;
+            if (fecha !== sysTodayStr) {
+                txDesc += ` \n[Ingreso al Sistema: ${sysDateTimeStr}]`;
+            }
             const txRow = [
                 `TX_${Date.now()}_${Math.floor(Math.random()*1000)}`,
                 'MANUAL',
@@ -913,7 +929,7 @@ const GoogleAPI = {
                 'Gasto',
                 'Activos: Compra de Maquinaria',
                 parsedCost.toString(),
-                `Compra de activo: ${nombre}`
+                txDesc
             ];
             await this.appendSheetData('Finanzas!A:G', [txRow]);
         }
