@@ -1563,3 +1563,125 @@ textarea.form-control {
     }
 }
 
+/* Modales en pantalla completa para dispositivos móviles (< 768px) */
+@media (max-width: 768px) {
+    .modal-card {
+        width: 100vw !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        max-width: 100vw !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        border: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    .modal-body {
+        overflow-y: auto !important;
+        flex: 1 1 auto !important;
+    }
+}
+
+/* Estilos para el Gestor Dinámico de Activos y Lotes */
+.group-lot-panel {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-left: 5px solid var(--brand-primary) !important;
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 15px var(--glass-shadow);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.group-lot-panel:hover {
+    box-shadow: 0 6px 20px var(--glass-shadow);
+}
+
+.cama-badge.disponible {
+    background-color: rgba(34, 197, 94, 0.1);
+    color: var(--text-success);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.cama-card.pending {
+    border: 1px dashed var(--glass-border) !important;
+    background: transparent;
+}
+
+.cama-card.pending:hover {
+    border-style: solid !important;
+    border-color: var(--brand-primary) !important;
+}
+
+.btn-close-batch-group {
+    background-color: #ef4444;
+    color: white;
+    border: 1px solid #ef4444;
+    border-radius: var(--radius-sm);
+    transition: background-color 0.2s, transform 0.1s;
+    font-weight: 600;
+}
+
+.btn-close-batch-group:hover {
+    background-color: #dc2626;
+    border-color: #dc2626;
+}
+
+.btn-close-batch-group:active {
+    transform: scale(0.98);
+}
+
+/* Custom styles for asset management forms */
+#form-manage-assets, #form-start-batch {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem;
+}
+
+.dark-theme #form-manage-assets, .dark-theme #form-start-batch {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* High contrast inputs for outdoor solar environments */
+.light-theme .form-control {
+    border: 2px solid var(--border-light) !important;
+    color: var(--text-primary-light) !important;
+    background-color: #ffffff !important;
+    font-weight: 500;
+}
+
+.light-theme .form-control::placeholder {
+    color: #64748b;
+}
+
+.light-theme .form-label {
+    color: var(--text-primary-light);
+    font-weight: 700;
+}
+
+/* Glassmorphism adjustments for high visibility */
+.light-theme .group-lot-panel {
+    background: #ffffff !important;
+    border: 2px solid var(--border-light) !important;
+    border-left: 6px solid var(--brand-primary) !important;
+}
+
+.light-theme .cama-card.pending {
+    border: 2px dashed var(--border-light) !important;
+    background: #f8fafc !important;
+    color: #000000 !important;
+}
+
+.light-theme .cama-card.fed {
+    background: rgba(34, 197, 94, 0.15) !important;
+    border: 2px solid rgba(34, 197, 94, 0.4) !important;
+}
+
+.light-theme .cama-card.fed .cama-number {
+    color: #15803d !important;
+}
+
+.light-theme .cama-card.fed .cama-status-indicator {
+    color: #166534 !important;
+}
+
+

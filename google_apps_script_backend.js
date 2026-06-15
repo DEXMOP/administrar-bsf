@@ -92,19 +92,16 @@ function doPost(e) {
     
     // Validar inicio de sesión/determinación de rol directo
     if (action === 'determineUserRole') {
-      // Si la tabla de usuarios está vacía, registrar como Admin, sino devolver rol obtenido
       var sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName('Usuarios');
       if (!sheet) return JSONResponse({ success: false, error: "Hoja de Usuarios no configurada" });
       
       var rows = sheet.getDataRange().getValues();
       if (rows.length <= 1) {
         sheet.appendRow([email, name, 'Administrador']);
-        // Limpiar caché de Usuarios
         CacheService.getScriptCache().remove("CACHE_DATA_Usuarios");
         return JSONResponse({ success: true, role: 'Administrador' });
       }
       
-      // Si no existía el usuario, añadirlo como Observador
       var userFound = false;
       for (var i = 1; i < rows.length; i++) {
         if (rows[i][0] && rows[i][0].toLowerCase().trim() === email) {
@@ -116,12 +113,286 @@ function doPost(e) {
       if (!userFound) {
         sheet.appendRow([email, name, 'Observador']);
         role = 'Observador';
-        // Limpiar caché de Usuarios
         CacheService.getScriptCache().remove("CACHE_DATA_Usuarios");
       }
       return JSONResponse({ success: true, role: role });
     }
     
+    var ss = SpreadsheetApp.openById(spreadsheetId);
+    var sysDateTimeStr = Utilities.formatDate(new Date(), "America/Lima", "yyyy-MM-dd HH:mm:ss");
+
+    // ==========================================
+    // ACCIÓN: manage_asset (Solo Admin/Socio)
+    // ==========================================
+    if (action === 'manage_asset') {
+      if (role !== 'Administrador' && role !== 'Socio') {
+        return JSONResponse({ success: false, error: "Acceso denegado: Solo Administradores o Socios pueden gestionar activos." });
+      }
+      
+      var assetIds = payload.assetIds;
+      var operation = payload.operation; // 'Alta' o 'Baja'
+      if (!assetIds || !Array.isArray(assetIds) || assetIds.length === 0) {
+        return JSONResponse({ success: false, error: "Faltan IDs de bandeja" });
+      }
+      
+      var camSheet = ss.getSheetByName('Camas');
+      if (!camSheet) return JSONResponse({ success: false, error: "Hoja Camas no encontrada" });
+      
+      var lock = LockService.getScriptLock();
+      try {
+        lock.waitLock(10000);
+      } catch (lockErr) {
+        return JSONResponse({ success: false, error: "Servidor ocupado. Intente de nuevo." });
+      }
+      
+      try {
+        var data = camSheet.getDataRange().getValues();
+        var idMap = {};
+        for (var i = 1; i < data.length; i++) {
+          idMap[data[i][0].toString().trim()] = i + 1; // row index (1-based)
+        }
+        
+        if (operation === 'Alta') {
+          var newRows = [];
+          for (var j = 0; j < assetIds.length; j++) {
+            var aId = assetIds[j].toString().trim();
+            if (idMap[aId]) {
+              // Si estaba de baja o inactivo, lo reactiva a Disponible
+              var rowIdx = idMap[aId];
+              camSheet.getRange(rowIdx, 2, 1, 3).setValues([['Disponible', '', '']]);
+            } else {
+              newRows.push([aId, 'Disponible', '', '']);
+            }
+          }
+          if (newRows.length > 0) {
+            camSheet.getRange(camSheet.getLastRow() + 1, 1, newRows.length, 4).setValues(newRows);
+          }
+        } else if (operation === 'Baja') {
+          for (var j = 0; j < assetIds.length; j++) {
+            var aId = assetIds[j].toString().trim();
+            if (!idMap[aId]) {
+              return JSONResponse({ success: false, error: "La bandeja " + aId + " no existe en el inventario." });
+            }
+            var rowIdx = idMap[aId];
+            var currentStatus = camSheet.getRange(rowIdx, 2).getValue().toString().trim();
+            if (currentStatus === 'En Servicio') {
+              return JSONResponse({ success: false, error: "La bandeja " + aId + " está 'En Servicio' y no se puede dar de baja." });
+            }
+            camSheet.getRange(rowIdx, 2, 1, 3).setValues([['Baja', '', '']]);
+          }
+        } else {
+          return JSONResponse({ success: false, error: "Operación no válida: " + operation });
+        }
+        
+        CacheService.getScriptCache().remove("CACHE_DATA_Camas");
+        return JSONResponse({ success: true });
+      } finally {
+        lock.releaseLock();
+      }
+    }
+
+    // ==========================================
+    // ACCIÓN: start_batch (Operario/Socio/Admin)
+    // ==========================================
+    if (action === 'start_batch') {
+      if (role === 'Observador') {
+        return JSONResponse({ success: false, error: "Acceso denegado: Permisos insuficientes." });
+      }
+      
+      var assetIds = payload.assetIds;
+      var grupo = payload.grupo;
+      if (!assetIds || !Array.isArray(assetIds) || assetIds.length === 0) {
+        return JSONResponse({ success: false, error: "Faltan bandejas para armar el lote." });
+      }
+      if (!grupo) {
+        return JSONResponse({ success: false, error: "Falta el nombre del grupo/lote." });
+      }
+      
+      var camSheet = ss.getSheetByName('Camas');
+      if (!camSheet) return JSONResponse({ success: false, error: "Hoja Camas no encontrada" });
+      
+      var lock = LockService.getScriptLock();
+      try {
+        lock.waitLock(10000);
+      } catch (lockErr) {
+        return JSONResponse({ success: false, error: "Servidor ocupado. Intente de nuevo." });
+      }
+      
+      try {
+        var data = camSheet.getDataRange().getValues();
+        var idMap = {};
+        for (var i = 1; i < data.length; i++) {
+          idMap[data[i][0].toString().trim()] = { row: i + 1, estado: data[i][1].toString().trim() };
+        }
+        
+        // Validación en caliente: Verificar que todas las bandejas sigan Disponibles
+        for (var j = 0; j < assetIds.length; j++) {
+          var aId = assetIds[j].toString().trim();
+          if (!idMap[aId]) {
+            return JSONResponse({ success: false, error: "La bandeja " + aId + " no existe." });
+          }
+          if (idMap[aId].estado !== 'Disponible') {
+            // Retornar error HTTP 400 (simulado en JSONResponse)
+            return JSONResponse({ success: false, error: "Colisión: La bandeja " + aId + " ya no está disponible (Estado: " + idMap[aId].estado + ")." });
+          }
+        }
+        
+        // Iniciar Lote y generar Ciclo_ID
+        var timestamp = Date.now();
+        var cleanGrupo = grupo.replace(/[^a-zA-Z0-9]/g, '_');
+        var cicloId = cleanGrupo + "-" + timestamp;
+        
+        // Actualizar hoja Camas
+        for (var j = 0; j < assetIds.length; j++) {
+          var aId = assetIds[j].toString().trim();
+          var rowIdx = idMap[aId].row;
+          camSheet.getRange(rowIdx, 2, 1, 3).setValues([['En Servicio', grupo, cicloId]]);
+        }
+        
+        // Escribir en Registro_Etapas
+        var stageSheet = ss.getSheetByName('Registro_Etapas');
+        if (stageSheet) {
+          var stageRows = [];
+          for (var j = 0; j < assetIds.length; j++) {
+            stageRows.push([
+              "STAGE_" + timestamp + "_" + Math.floor(Math.random()*1000) + "_" + j,
+              assetIds[j].toString().trim(),
+              sysDateTimeStr,
+              "Disponible",
+              "Neonatos",
+              "Inicio de lote " + grupo + " (" + cicloId + ")",
+              name
+            ]);
+          }
+          stageSheet.getRange(stageSheet.getLastRow() + 1, 1, stageRows.length, 7).setValues(stageRows);
+          CacheService.getScriptCache().remove("CACHE_DATA_Registro_Etapas");
+        }
+        
+        CacheService.getScriptCache().remove("CACHE_DATA_Camas");
+        return JSONResponse({ success: true, cicloId: cicloId });
+      } finally {
+        lock.releaseLock();
+      }
+    }
+
+    // ==========================================
+    // ACCIÓN: close_batch (Operario/Socio/Admin)
+    // ==========================================
+    if (action === 'close_batch') {
+      if (role === 'Observador') {
+        return JSONResponse({ success: false, error: "Acceso denegado: Permisos insuficientes." });
+      }
+      
+      var cicloId = payload.cicloId;
+      var biomasaCosechada = parseFloat(payload.biomasaCosechada) || 0;
+      
+      if (!cicloId) {
+        return JSONResponse({ success: false, error: "Falta el Ciclo ID" });
+      }
+      
+      var camSheet = ss.getSheetByName('Camas');
+      if (!camSheet) return JSONResponse({ success: false, error: "Hoja Camas no encontrada" });
+      
+      var lock = LockService.getScriptLock();
+      try {
+        lock.waitLock(10000);
+      } catch (lockErr) {
+        return JSONResponse({ success: false, error: "Servidor ocupado. Intente de nuevo." });
+      }
+      
+      try {
+        var data = camSheet.getDataRange().getValues();
+        var traysToRelease = [];
+        var grupo = '';
+        
+        for (var i = 1; i < data.length; i++) {
+          if (data[i][3] && data[i][3].toString().trim() === cicloId) {
+            traysToRelease.push({ row: i + 1, id: data[i][0] });
+            if (!grupo) grupo = data[i][2];
+          }
+        }
+        
+        if (traysToRelease.length === 0) {
+          return JSONResponse({ success: false, error: "No se encontraron bandejas activas para el ciclo: " + cicloId });
+        }
+        
+        // Sumar todos los kilos de alimento suministrados a este Ciclo_ID de Registro_Alimentacion
+        var totalAlimento = 0;
+        var alimSheet = ss.getSheetByName('Registro_Alimentacion');
+        if (alimSheet) {
+          var alimData = alimSheet.getDataRange().getValues();
+          for (var m = 1; m < alimData.length; m++) {
+            if (alimData[m][8] && alimData[m][8].toString().trim() === cicloId) {
+              totalAlimento += parseFloat(alimData[m][5]) || 0;
+            }
+          }
+        }
+        
+        // Obtener fecha de inicio desde Registro_Etapas
+        var fechaInicio = '';
+        var stageSheet = ss.getSheetByName('Registro_Etapas');
+        if (stageSheet) {
+          var stageData = stageSheet.getDataRange().getValues();
+          for (var n = 1; n < stageData.length; n++) {
+            var obs = stageData[n][5] ? stageData[n][5].toString() : '';
+            if (obs.indexOf(cicloId) !== -1) {
+              fechaInicio = stageData[n][2];
+              break;
+            }
+          }
+        }
+        if (!fechaInicio) {
+          var parts = cicloId.split('-');
+          var ts = parseInt(parts[parts.length - 1]);
+          if (!isNaN(ts)) {
+            fechaInicio = Utilities.formatDate(new Date(ts), "America/Lima", "yyyy-MM-dd HH:mm:ss");
+          } else {
+            fechaInicio = sysDateTimeStr;
+          }
+        }
+        
+        // Guardar registro histórico en Historico_Ciclos
+        var histSheet = ss.getSheetByName('Historico_Ciclos');
+        if (!histSheet) {
+          ss.insertSheet('Historico_Ciclos');
+          histSheet = ss.getSheetByName('Historico_Ciclos');
+          histSheet.appendRow(['Ciclo_ID', 'Grupo', 'Bandejas_IDs', 'Fecha_Inicio', 'Fecha_Cierre', 'Alimento_Consumido_Kg', 'Biomasa_Cosechada_Kg', 'Usuario']);
+        }
+        var trayIdsList = traysToRelease.map(function(t) { return t.id; }).join(', ');
+        histSheet.appendRow([cicloId, grupo || 'Sin Grupo', trayIdsList, fechaInicio, sysDateTimeStr, totalAlimento, biomasaCosechada, name]);
+        
+        // Escribir en Registro_Etapas el fin del ciclo
+        if (stageSheet) {
+          var stageRows = [];
+          var nowTs = Date.now();
+          for (var k = 0; k < traysToRelease.length; k++) {
+            stageRows.push([
+              "STAGE_" + nowTs + "_" + Math.floor(Math.random()*1000) + "_" + k,
+              traysToRelease[k].id,
+              sysDateTimeStr,
+              "En Servicio",
+              "Disponible",
+              "Lote cerrado y cosechado (" + cicloId + "). Cosecha: " + biomasaCosechada.toFixed(2) + " kg. Alimento: " + totalAlimento.toFixed(2) + " kg.",
+              name
+            ]);
+          }
+          stageSheet.getRange(stageSheet.getLastRow() + 1, 1, stageRows.length, 7).setValues(stageRows);
+          CacheService.getScriptCache().remove("CACHE_DATA_Registro_Etapas");
+        }
+        
+        // Libera las bandejas: vuelven a Disponible, limpia grupo y ciclo
+        for (var k = 0; k < traysToRelease.length; k++) {
+          camSheet.getRange(traysToRelease[k].row, 2, 1, 3).setValues([['Disponible', '', '']]);
+        }
+        
+        CacheService.getScriptCache().remove("CACHE_DATA_Camas");
+        CacheService.getScriptCache().remove("CACHE_DATA_Historico_Ciclos");
+        return JSONResponse({ success: true });
+      } finally {
+        lock.releaseLock();
+      }
+    }
+
     // 2. Control de accesos por roles (RBAC Server-Side)
     var range = payload.range;
     var sheetName = range ? range.split('!')[0] : '';
@@ -147,19 +418,17 @@ function doPost(e) {
     
     if (isInventoryWrite) {
       try {
-        lock.waitLock(10000); // Bloqueo por hasta 10 segundos
+        lock.waitLock(10000);
       } catch (lockErr) {
         return JSONResponse({ success: false, error: "Servidor ocupado (Lock Timeout). Por favor, reintente en unos instantes." });
       }
     }
     
     try {
-      // Lógica de validación de Stock Negativo estricta en caliente
       if (isInventoryWrite && payload.values && payload.values.length > 0) {
-        var insumosSheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName('Insumos');
+        var insumosSheet = ss.getSheetByName('Insumos');
         var insumosData = insumosSheet.getDataRange().getValues();
         
-        // Calcular stock actual en caliente
         var stockMap = {};
         for (var k = 1; k < insumosData.length; k++) {
           var insName = insumosData[k][3] ? insumosData[k][3].toString().toLowerCase().trim() : '';
@@ -172,7 +441,6 @@ function doPost(e) {
           }
         }
         
-        // Validar transacciones entrantes
         for (var i = 0; i < payload.values.length; i++) {
           var row = payload.values[i];
           var nameCheck = row[3] ? row[3].toString().toLowerCase().trim() : '';
@@ -192,18 +460,33 @@ function doPost(e) {
         }
       }
       
-      // Ejecución de escrituras
-      var ss = SpreadsheetApp.openById(spreadsheetId);
-      
       if (action === 'append') {
         var sheet = ss.getSheetByName(sheetName);
         if (!sheet) return JSONResponse({ success: false, error: "Hoja no encontrada: " + sheetName });
         
+        var values = payload.values;
+        // Inyectar Ciclo_ID si viene en el payload y no está en la fila
+        if (sheetName === 'Registro_Alimentacion' || sheetName === 'Reportes') {
+          var cicloId = payload.cicloId || '';
+          var colCount = sheetName === 'Registro_Alimentacion' ? 9 : 7;
+          for (var i = 0; i < values.length; i++) {
+            var row = values[i];
+            if (row.length < colCount) {
+              while (row.length < colCount - 1) {
+                row.push('');
+              }
+              row.push(cicloId);
+            } else if (!row[colCount - 1] && cicloId) {
+              row[colCount - 1] = cicloId;
+            }
+          }
+        }
+        
         var lastRow = sheet.getLastRow();
         if (lastRow === 0) {
-          sheet.getRange(1, 1, payload.values.length, payload.values[0].length).setValues(payload.values);
+          sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
         } else {
-          sheet.getRange(lastRow + 1, 1, payload.values.length, payload.values[0].length).setValues(payload.values);
+          sheet.getRange(lastRow + 1, 1, values.length, values[0].length).setValues(values);
         }
       }
       
@@ -234,7 +517,6 @@ function doPost(e) {
         return JSONResponse({ success: true, fileId: file.getId() });
       }
       
-      // 5. Invalidación Determinista de Caché al escribir
       if (sheetName) {
         CacheService.getScriptCache().remove("CACHE_DATA_" + sheetName);
       }
@@ -251,9 +533,6 @@ function doPost(e) {
   }
 }
 
-/**
- * Auxiliar: Decodificar payload de JWT sin librerías externas
- */
 function decodeJwt(idToken) {
   if (!idToken) return null;
   var parts = idToken.split('.');
@@ -262,10 +541,9 @@ function decodeJwt(idToken) {
     var decodedPayload = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[1])).getDataAsString();
     var parsed = JSON.parse(decodedPayload);
     
-    // Verificar expiración del token
     var nowSecs = Date.now() / 1000;
     if (parsed.exp && nowSecs > parsed.exp) {
-      return null; // Token expirado
+      return null;
     }
     return parsed;
   } catch (err) {
@@ -273,9 +551,6 @@ function decodeJwt(idToken) {
   }
 }
 
-/**
- * Auxiliar: Obtener rol del usuario en la base de datos
- */
 function getUserRole(email, spreadsheetId) {
   try {
     var sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName('Usuarios');
@@ -292,9 +567,6 @@ function getUserRole(email, spreadsheetId) {
   }
 }
 
-/**
- * Auxiliar: Validar permisos de roles en el servidor (RBAC)
- */
 function isActionAllowed(role, action, range, values) {
   if (role === 'Administrador' || role === 'Socio') {
     return true;
@@ -304,7 +576,6 @@ function isActionAllowed(role, action, range, values) {
   }
   if (role === 'Operario') {
     var sheetName = range.split('!')[0];
-    // Operarios no pueden escribir libremente en la hoja de Finanzas
     if (sheetName === 'Finanzas') {
       if (values && values.length > 0) {
         for (var i = 0; i < values.length; i++) {
@@ -315,7 +586,7 @@ function isActionAllowed(role, action, range, values) {
           var isAutoMaquinaria = id.indexOf('TX_') === 0 && desc.indexOf('Compra de activo:') !== -1;
           
           if (!isAutoInsumo && !isAutoMaquinaria) {
-            return false; // Bloquear escrituras manuales en finanzas
+            return false;
           }
         }
         return true;
@@ -327,9 +598,6 @@ function isActionAllowed(role, action, range, values) {
   return false;
 }
 
-/**
- * Auxiliar: Registrar firma de auditoría inmutable en fechas retroactivas (Lima/Perú)
- */
 function applyServerSideAuditing(sheetName, values, role) {
   var peruToday = Utilities.formatDate(new Date(), "America/Lima", "yyyy-MM-dd");
   var sysDateTimeStr = Utilities.formatDate(new Date(), "America/Lima", "yyyy-MM-dd HH:mm:ss");
@@ -372,9 +640,6 @@ function applyServerSideAuditing(sheetName, values, role) {
   }
 }
 
-/**
- * Responder con formato JSON limpio
- */
 function JSONResponse(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);

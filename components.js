@@ -68,11 +68,11 @@ const Components = {
      */
     renderTinaSelection(camas, prefix) {
         if (camas.length === 0) {
-            return `<div class="text-center text-secondary py-3">No hay tinas activas en este momento.</div>`;
+            return `<div class="text-center text-secondary py-3">No hay bandejas activas en este momento.</div>`;
         }
         const groupsMap = {};
         camas.forEach(c => {
-            const groupName = c[4] || 'Sin Lote';
+            const groupName = c[2] || 'Sin Lote';
             if (!groupsMap[groupName]) groupsMap[groupName] = [];
             groupsMap[groupName].push(c);
         });
@@ -91,7 +91,7 @@ const Components = {
                     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.5rem;">
                         ${tinasInGroup.map(c => {
                             const id = c[0];
-                            const name = c[1].replace('Cama', 'Tina');
+                            const name = "Bandeja " + id;
                             return `
                                 <div class="card p-2 text-center cursor-pointer tina-select-card" data-id="${id}" data-prefix="${prefix}" style="border: 2px solid var(--border-color); background-color: var(--bg-secondary); margin-bottom: 0; user-select: none; transition: all 0.2s;">
                                     <input type="checkbox" class="${prefix}-tina-chk tina-checkbox-group-${groupSafeId} hidden" value="${id}" id="chk-${prefix}-${id}">
@@ -152,24 +152,39 @@ const Components = {
 
         // Pre-fill if some settings exist
         if (GoogleAPI.config) {
-            document.getElementById('setup-api-key').value = GoogleAPI.config.apiKey || '';
-            document.getElementById('setup-client-id').value = GoogleAPI.config.clientId || '';
-            document.getElementById('setup-sheet-id').value = GoogleAPI.config.spreadsheetId || '';
-            document.getElementById('setup-folder-id').value = GoogleAPI.config.driveFolderId || '';
-            document.getElementById('setup-script-url').value = GoogleAPI.config.appsScriptUrl || '';
+            const apiKeyEl = document.getElementById('setup-api-key');
+            const clientIdEl = document.getElementById('setup-client-id');
+            const sheetIdEl = document.getElementById('setup-sheet-id');
+            const folderIdEl = document.getElementById('setup-folder-id');
+            const scriptUrlEl = document.getElementById('setup-script-url');
+
+            if (apiKeyEl) apiKeyEl.value = GoogleAPI.config.apiKey || '';
+            if (clientIdEl) clientIdEl.value = GoogleAPI.config.clientId || '';
+            if (sheetIdEl) sheetIdEl.value = GoogleAPI.config.spreadsheetId || '';
+            if (folderIdEl) folderIdEl.value = GoogleAPI.config.driveFolderId || '';
+            if (scriptUrlEl) scriptUrlEl.value = GoogleAPI.config.appsScriptUrl || '';
         }
 
-        document.getElementById('setup-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const config = {
-                apiKey: document.getElementById('setup-api-key').value.trim(),
-                clientId: document.getElementById('setup-client-id').value.trim(),
-                spreadsheetId: document.getElementById('setup-sheet-id').value.trim(),
-                driveFolderId: document.getElementById('setup-folder-id').value.trim() || null,
-                appsScriptUrl: document.getElementById('setup-script-url').value.trim() || null
-            };
-            onSaveCallback(config);
-        });
+        const setupForm = document.getElementById('setup-form');
+        if (setupForm) {
+            setupForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const apiKeyEl = document.getElementById('setup-api-key');
+                const clientIdEl = document.getElementById('setup-client-id');
+                const sheetIdEl = document.getElementById('setup-sheet-id');
+                const folderIdEl = document.getElementById('setup-folder-id');
+                const scriptUrlEl = document.getElementById('setup-script-url');
+
+                const config = {
+                    apiKey: apiKeyEl ? apiKeyEl.value.trim() : '',
+                    clientId: clientIdEl ? clientIdEl.value.trim() : '',
+                    spreadsheetId: sheetIdEl ? sheetIdEl.value.trim() : '',
+                    driveFolderId: (folderIdEl && folderIdEl.value.trim()) ? folderIdEl.value.trim() : null,
+                    appsScriptUrl: (scriptUrlEl && scriptUrlEl.value.trim()) ? scriptUrlEl.value.trim() : null
+                };
+                onSaveCallback(config);
+            });
+        }
     },
 
     /**
@@ -183,9 +198,9 @@ const Components = {
             // Fetch necessary data from Sheets
             const financeRows = await GoogleAPI.getSheetData('Finanzas!A:G');
             const supplyRows = await GoogleAPI.getSheetData('Insumos!A:H');
-            const reportRows = await GoogleAPI.getSheetData('Reportes!A:F');
-            const camasRows = await GoogleAPI.getSheetData('Camas!A:E');
-            const feedingRows = await GoogleAPI.getSheetData('Registro_Alimentacion!A:H');
+            const reportRows = await GoogleAPI.getSheetData('Reportes!A:G');
+            const camasRows = await GoogleAPI.getSheetData('Camas!A:D');
+            const feedingRows = await GoogleAPI.getSheetData('Registro_Alimentacion!A:I');
 
             // Skip headers in processing
             const finances = financeRows.slice(1);
@@ -246,13 +261,13 @@ const Components = {
             });
 
             // Larva feeding alarms (Semáforo / Alarma de un día sin comer)
-            const activeTinas = camasRows.slice(1).filter(c => c[3] === 'Activo');
+            const activeTinas = camasRows.slice(1).filter(c => c[1] === 'En Servicio');
             const feedings = feedingRows.slice(1);
             const nowTime = new Date();
 
             activeTinas.forEach(tina => {
                 const tinaId = tina[0];
-                const tinaName = tina[1].replace('Cama', 'Tina');
+                const tinaName = "Bandeja " + tinaId;
                 
                 // Get feedings for this tina
                 const tinaFeedings = feedings.filter(f => f[1] === tinaId);
@@ -369,9 +384,12 @@ const Components = {
             `;
 
             // Setup Quick Report Button redirection
-            document.getElementById('btn-quick-report').addEventListener('click', () => {
-                window.location.hash = '#add-report';
-            });
+            const btnQuickReport = document.getElementById('btn-quick-report');
+            if (btnQuickReport) {
+                btnQuickReport.addEventListener('click', () => {
+                    window.location.hash = '#add-report';
+                });
+            }
 
             // Initialize Charts using Chart.js
             this.renderDashboardCharts(finances);
@@ -571,7 +589,7 @@ const Components = {
         let users = [];
         try {
             const rawCamas = await GoogleAPI.getCamas();
-            camas = rawCamas.slice(1).filter(c => c[3] === 'Activo');
+            camas = rawCamas.slice(1).filter(c => c[1] === 'En Servicio');
             users = await GoogleAPI.getUsuarios();
         } catch (err) {
             console.error("Error loading data for report", err);
@@ -671,7 +689,7 @@ const Components = {
                                 </div>
                                 <div class="form-group mb-0" style="margin-bottom: 0;">
                                     <label class="form-label" for="report-feed-qty">Cantidad Suministrada</label>
-                                    <input type="number" id="report-feed-qty" class="form-control" placeholder="0.0" step="0.1" min="0.1">
+                                    <input type="number" inputmode="decimal" id="report-feed-qty" class="form-control" placeholder="0.0" step="0.1" min="0.1">
                                     ${this.renderQuickQtyButtons('report-feed-qty', false, 'kg')}
                                 </div>
                                 <div class="form-group mb-0" style="margin-bottom: 0;">
@@ -735,7 +753,7 @@ const Components = {
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="finance-amount">Monto Pagado ($)</label>
-                                <input type="number" id="finance-amount" class="form-control" placeholder="0.00" step="0.01" min="0.01" required>
+                                <input type="number" inputmode="decimal" id="finance-amount" class="form-control" placeholder="0.00" step="0.01" min="0.01" required>
                                 ${this.renderQuickQtyButtons('finance-amount', true)}
                             </div>
                         </div>
@@ -810,7 +828,7 @@ const Components = {
                         <div class="form-row-3" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
                             <div class="form-group">
                                 <label class="form-label" for="supply-qty">Cantidad Movida</label>
-                                <input type="number" id="supply-qty" class="form-control" placeholder="0.0" step="0.1" min="0.1" required>
+                                <input type="number" inputmode="decimal" id="supply-qty" class="form-control" placeholder="0.0" step="0.1" min="0.1" required>
                                 ${this.renderQuickQtyButtons('supply-qty', false, 'kg')}
                             </div>
                             <div class="form-group">
@@ -848,7 +866,7 @@ const Components = {
                              </div>
                              <div class="form-group">
                                  <label class="form-label" for="supply-cost">Costo Total ($) (Opcional si es compra recién ingresada)</label>
-                                 <input type="number" id="supply-cost" class="form-control" placeholder="Dejar vacío si no costó dinero" step="0.01" min="0">
+                                 <input type="number" inputmode="decimal" id="supply-cost" class="form-control" placeholder="Dejar vacío si no costó dinero" step="0.01" min="0">
                                  ${this.renderQuickQtyButtons('supply-cost', true)}
                              </div>
                          </div>
@@ -883,7 +901,7 @@ const Components = {
                          <div class="form-row-2">
                              <div class="form-group">
                                  <label class="form-label" for="machinery-qty">Cantidad</label>
-                                 <input type="number" id="machinery-qty" class="form-control" value="1" min="1" step="1" required>
+                                 <input type="number" inputmode="decimal" id="machinery-qty" class="form-control" value="1" min="1" step="1" required>
                              </div>
                              <div class="form-group">
                                  <label class="form-label" for="machinery-size">Tamaño / Capacidad (Opcional)</label>
@@ -893,7 +911,7 @@ const Components = {
                         <div class="form-row-2">
                             <div class="form-group">
                                 <label class="form-label" for="machinery-cost">Precio de Compra ($)</label>
-                                <input type="number" id="machinery-cost" class="form-control" placeholder="0.00" step="0.01" min="0" required>
+                                <input type="number" inputmode="decimal" id="machinery-cost" class="form-control" placeholder="0.00" step="0.01" min="0" required>
                                 ${this.renderQuickQtyButtons('machinery-cost', true)}
                             </div>
                             <div class="form-group">
@@ -943,12 +961,12 @@ const Components = {
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="sale-qty">Cantidad</label>
-                                <input type="number" id="sale-qty" class="form-control" placeholder="0.0" step="0.1" min="0.1" required>
+                                <input type="number" inputmode="decimal" id="sale-qty" class="form-control" placeholder="0.0" step="0.1" min="0.1" required>
                                 ${this.renderQuickQtyButtons('sale-qty', false, 'unid')}
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="sale-price">Precio Unitario ($)</label>
-                                <input type="number" id="sale-price" class="form-control" placeholder="0.00" step="0.01" min="0.01" required>
+                                <input type="number" inputmode="decimal" id="sale-price" class="form-control" placeholder="0.00" step="0.01" min="0.01" required>
                                 ${this.renderQuickQtyButtons('sale-price', true)}
                             </div>
                         </div>
@@ -997,21 +1015,24 @@ const Components = {
                 tab.classList.add('active');
 
                 const targetForm = tab.getAttribute('data-form');
-                secBitacora.classList.add('hidden');
-                secFinanzas.classList.add('hidden');
-                secInsumos.classList.add('hidden');
-                secMaquinaria.classList.add('hidden');
-                secIngresos.classList.add('hidden');
+                
+                // PARCHE: Validar existencia antes de ocultar (RBAC Compliance)
+                if (secBitacora) secBitacora.classList.add('hidden');
+                if (secFinanzas) secFinanzas.classList.add('hidden');
+                if (secInsumos) secInsumos.classList.add('hidden');
+                if (secMaquinaria) secMaquinaria.classList.add('hidden');
+                if (secIngresos) secIngresos.classList.add('hidden');
 
-                if (targetForm === 'section-bitacora') {
+                // PARCHE: Validar existencia antes de mostrar
+                if (targetForm === 'section-bitacora' && secBitacora) {
                     secBitacora.classList.remove('hidden');
-                } else if (targetForm === 'section-finanzas') {
+                } else if (targetForm === 'section-finanzas' && secFinanzas) {
                     secFinanzas.classList.remove('hidden');
-                } else if (targetForm === 'section-insumos') {
+                } else if (targetForm === 'section-insumos' && secInsumos) {
                     secInsumos.classList.remove('hidden');
-                } else if (targetForm === 'section-maquinaria') {
+                } else if (targetForm === 'section-maquinaria' && secMaquinaria) {
                     secMaquinaria.classList.remove('hidden');
-                } else if (targetForm === 'section-ingresos') {
+                } else if (targetForm === 'section-ingresos' && secIngresos) {
                     secIngresos.classList.remove('hidden');
                 }
             });
@@ -1201,11 +1222,10 @@ const Components = {
                 if (draft.feedUnit) document.getElementById('report-feed-unit').value = draft.feedUnit;
 
                 // Trigger events to restore UI dynamically
-                document.getElementById('report-category').dispatchEvent(new Event('change'));
+                const catEl = document.getElementById('report-category');
+                if (catEl) catEl.dispatchEvent(new Event('change'));
                 const feedUnitInput = document.getElementById('report-feed-unit');
-                if (feedUnitInput) {
-                    feedUnitInput.dispatchEvent(new Event('change'));
-                }
+                if (feedUnitInput) feedUnitInput.dispatchEvent(new Event('change'));
             } catch (err) {
                 console.error("Fallo al restaurar borrador", err);
             }
@@ -1221,9 +1241,11 @@ const Components = {
                 feedUnit: document.getElementById('report-feed-unit')?.value || ''
             };
             localStorage.setItem('bsf_report_draft', JSON.stringify(draft));
-        const form = document.getElementById('add-report-form');
-        if (form) {
-            form.querySelectorAll('input, textarea, select').forEach(input => {
+        }; // PARCHE: AQUÍ FALTABA ESTA LLAVE DE CIERRE.
+
+        const formRepDraft = document.getElementById('add-report-form');
+        if (formRepDraft) {
+            formRepDraft.querySelectorAll('input, textarea, select').forEach(input => {
                 input.addEventListener('input', saveReportDraft);
                 input.addEventListener('change', saveReportDraft);
             });
@@ -1232,7 +1254,8 @@ const Components = {
 
         // FORM SUBMIT 1: DAILY REPORT & FEEDING (Bitácora)
         const formReport = document.getElementById('add-report-form');
-        formReport.addEventListener('submit', async (e) => {
+        if (formReport) {
+            formReport.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (GoogleAPI.user.role === 'Observador') {
                 alert("Acceso denegado: El rol 'Observador' no puede ingresar datos.");
@@ -1334,14 +1357,25 @@ const Components = {
 
                 let reportDesc = collabMeta + document.getElementById('report-desc').value;
 
-                // 2. Prepare Report Row values
+                // Resolve Ciclo_ID for the report and selected tinas
+                let reportCicloId = '';
+                if (reportCat === 'Alimentación' && selectedTinas.length > 0) {
+                    const firstTinaId = selectedTinas[0];
+                    const trayObj = camas.find(c => c[0] === firstTinaId);
+                    if (trayObj && trayObj[3]) {
+                        reportCicloId = trayObj[3].toString().trim();
+                    }
+                }
+
+                // 2. Prepare Report Row values (including Ciclo_ID as 7th column)
                 const reportValues = [[
                     reportId,
                     formattedDate,
                     reportDesc,
                     '', // Resolved in background when uploading base64
                     reportCat,
-                    GoogleAPI.user.name
+                    GoogleAPI.user.name,
+                    reportCicloId
                 ]];
 
                 const payload = {
@@ -1353,9 +1387,14 @@ const Components = {
                     username: GoogleAPI.user.name,
                     localImages,
                     reportValues,
+                    cicloId: reportCicloId, // Pass at top level for append payload injection
                     isAlimentacion: reportCat === 'Alimentación',
                     alimentacion: reportCat === 'Alimentación' ? {
-                        selectedTinas,
+                        selectedTinas: selectedTinas.map(tinaId => {
+                            const trayObj = camas.find(c => c[0] === tinaId);
+                            const tinaCiclo = (trayObj && trayObj[3]) ? trayObj[3].toString().trim() : 'Ciclo Legacy';
+                            return { id: tinaId, cicloId: tinaCiclo };
+                        }),
                         feedUnit: document.getElementById('report-feed-unit').value,
                         insumo,
                         totalQty
@@ -1399,206 +1438,217 @@ const Components = {
         });
 
         // FORM SUBMIT 2: FINANCES (Expenses)
-        document.getElementById('add-finance-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (GoogleAPI.user.role === 'Observador') {
-                alert("Acceso denegado: El rol 'Observador' no puede ingresar datos.");
-                return;
-            }
-
-            try {
-                const finId = `FIN_${Date.now()}`;
-                const finType = document.getElementById('finance-type').value;
-                const finAmount = parseFloat(document.getElementById('finance-amount').value);
-                const finCat = document.getElementById('finance-category').value.trim();
-                const finDate = document.getElementById('finance-date').value;
-
-                // Collaborators metadata
-                const selectedCollabs = Array.from(container.querySelectorAll('input.finance-collab-chk:checked')).map(cb => cb.value);
-                let collabMeta = '';
-                if (selectedCollabs.length > 0) {
-                    collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
+        const addFinanceForm = document.getElementById('add-finance-form');
+        if (addFinanceForm) {
+            addFinanceForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (GoogleAPI.user.role === 'Observador') {
+                    alert("Acceso denegado: El rol 'Observador' no puede ingresar datos.");
+                    return;
                 }
 
-                let finDesc = collabMeta + document.getElementById('finance-desc').value.trim();
+                try {
+                    const finId = `FIN_${Date.now()}`;
+                    const finType = document.getElementById('finance-type').value;
+                    const finAmount = parseFloat(document.getElementById('finance-amount').value);
+                    const finCat = document.getElementById('finance-category').value.trim();
+                    const finDate = document.getElementById('finance-date').value;
 
-                const financeValues = [[
-                    finId,
-                    'MANUAL',
-                    finDate,
-                    finType,
-                    finCat,
-                    finAmount,
-                    finDesc
-                ]];
-
-                const payload = { financeValues };
-
-                // Clear/Reset immediately
-                document.getElementById('add-finance-form').reset();
-                document.getElementById('finance-date').value = todayStr;
-                container.querySelectorAll('.collab-select-card[data-prefix="finance"]').forEach(c => c.classList.remove('selected'));
-                
-                // Redirect immediately
-                window.location.hash = '#finances';
-
-                // Dispatch background submission
-                executeBackgroundSubmit('add-finance', payload, () => GoogleAPI.appendSheetData('Finanzas!A:G', financeValues));
-
-            } catch (err) {
-                console.error("Finance submit error", err);
-                showToast(`Error al procesar gasto: ${err.message}`, "error");
-            }
-        });
-
-        // FORM SUBMIT 3: SUPPLIES (Warehouse)
-        document.getElementById('add-supply-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (GoogleAPI.user.role === 'Observador') {
-                alert("Acceso denegado: El rol 'Observador' no puede ingresar datos.");
-                return;
-            }
-
-            const supplyAction = document.getElementById('supply-action').value;
-            let selectedTinas = [];
-            if (supplyAction === 'Utilización') {
-                const selectedChks = container.querySelectorAll('input.supply-tina-chk:checked');
-                selectedTinas = Array.from(selectedChks).map(chk => chk.value);
-            }
-
-            try {
-                const supId = `SUP_${Date.now()}`;
-                const supplyCategory = document.getElementById('supply-category').value;
-                const supplyName = document.getElementById('supply-name').value.trim();
-                const supplyQty = parseFloat(document.getElementById('supply-qty').value);
-                const supplyUnit = document.getElementById('supply-unit').value;
-                const supplyDate = document.getElementById('supply-date').value;
-                const supplyCost = parseFloat(document.getElementById('supply-cost').value) || 0;
-                const supplySize = document.getElementById('supply-size').value;
-
-                // Validation to prevent negative stock on Utilización (only online)
-                if (supplyAction === 'Utilización' && navigator.onLine) {
-                    try {
-                        const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
-                        let currentStock = 0;
-                        let unit = '';
-                        supplyRows.slice(1).forEach(row => {
-                            const name = row[3] ? row[3].trim().toLowerCase() : '';
-                            if (name === supplyName.toLowerCase()) {
-                                const act = row[4];
-                                const qty = parseFloat(row[5]) || 0;
-                                unit = row[6] || 'kg';
-                                if (act === 'Adición') currentStock += qty;
-                                else if (act === 'Utilización') currentStock -= qty;
-                            }
-                        });
-
-                        if (supplyQty > currentStock) {
-                            alert(`Error: No hay suficiente stock en bodega para esta utilización.\nStock actual de "${supplyName}": ${currentStock.toFixed(2)} ${unit}.\nCantidad solicitada: ${supplyQty.toFixed(2)} ${unit}.`);
-                            return;
-                        }
-                    } catch (stockErr) {
-                        console.warn("Fallo al verificar stock en bodega, ignorando check offline:", stockErr);
-                    }
-                }
-
-                // Collaborators metadata
-                const selectedCollabs = Array.from(container.querySelectorAll('input.supply-collab-chk:checked')).map(cb => cb.value);
-                let collabMeta = '';
-                if (selectedCollabs.length > 0) {
-                    collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
-                }
-
-                const supplyValues = [[
-                    supId,
-                    'MANUAL',
-                    supplyDate,
-                    supplyName,
-                    supplyAction,
-                    supplyQty,
-                    supplyUnit,
-                    supplyCost,
-                    supplyCategory,
-                    supplySize
-                ]];
-
-                // If Action is Utilización and N > 0 tinas selected, write feeding logs
-                let feedingRows = [];
-                if (supplyAction === 'Utilización' && selectedTinas.length > 0) {
-                    const qtyPerTina = supplyQty / selectedTinas.length;
-
-                    let nextOrder = 1;
-                    if (navigator.onLine) {
-                        try {
-                            const allLogs = await GoogleAPI.getFeedingLogs();
-                            const todayLogs = allLogs.slice(1).filter(log => log[2] && log[2].startsWith(supplyDate));
-                            nextOrder = todayLogs.length + 1;
-                        } catch (e) {
-                            console.warn("No se pudo consultar logs de alimentación", e);
-                        }
+                    // Collaborators metadata
+                    const selectedCollabs = Array.from(container.querySelectorAll('input.finance-collab-chk:checked')).map(cb => cb.value);
+                    let collabMeta = '';
+                    if (selectedCollabs.length > 0) {
+                        collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
                     }
 
-                    const nowTime = new Date().toTimeString().split(' ')[0]; // HH:MM:SS
-                    const formattedDate = `${supplyDate} ${nowTime}`;
+                    let finDesc = collabMeta + document.getElementById('finance-desc').value.trim();
 
-                    feedingRows = selectedTinas.map(tinaId => {
-                        const row = [
-                            `FEED_${Date.now()}_${Math.floor(Math.random()*1000)}`,
-                            tinaId,
-                            formattedDate,
-                            nextOrder,
-                            supplyName,
-                            qtyPerTina,
-                            GoogleAPI.user.name,
-                            `Alimentación manual vía Movimiento de Insumo ${supId} (${supplyUnit}) ${collabMeta}`
-                        ];
-                        nextOrder++;
-                        return row;
-                    });
-                }
-
-                // If supply has cost, auto-generate a financial record of Gasto
-                let financeValues = [];
-                if (supplyCost > 0) {
-                    let finDesc = `${collabMeta}Compra auto-registrada de ${supplyQty} ${supplyUnit} de ${supplyName} (${supplySize})`;
-                    const finId = `FIN_${Date.now()}_SUP`;
-                    financeValues = [[
+                    const financeValues = [[
                         finId,
                         'MANUAL',
-                        supplyDate,
-                        'Gasto',
-                        'Operativo: Compra de Insumos',
-                        supplyCost,
+                        finDate,
+                        finType,
+                        finCat,
+                        finAmount,
                         finDesc
                     ]];
+
+                    const payload = { financeValues };
+
+                    // Clear/Reset immediately
+                    addFinanceForm.reset();
+                    const financeDateEl = document.getElementById('finance-date');
+                    if (financeDateEl) financeDateEl.value = todayStr;
+                    container.querySelectorAll('.collab-select-card[data-prefix="finance"]').forEach(c => c.classList.remove('selected'));
+                    
+                    // Redirect immediately
+                    window.location.hash = '#finances';
+
+                    // Dispatch background submission
+                    executeBackgroundSubmit('add-finance', payload, () => GoogleAPI.appendSheetData('Finanzas!A:G', financeValues));
+
+                } catch (err) {
+                    console.error("Finance submit error", err);
+                    showToast(`Error al procesar gasto: ${err.message}`, "error");
+                }
+            });
+        }
+
+        // FORM SUBMIT 3: SUPPLIES (Warehouse)
+        const addSupplyForm = document.getElementById('add-supply-form');
+        if (addSupplyForm) {
+            addSupplyForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (GoogleAPI.user.role === 'Observador') {
+                    alert("Acceso denegado: El rol 'Observador' no puede ingresar datos.");
+                    return;
                 }
 
-                const payload = {
-                    supplyValues,
-                    feedingRows,
-                    financeValues
-                };
+                const supplyAction = document.getElementById('supply-action').value;
+                let selectedTinas = [];
+                if (supplyAction === 'Utilización') {
+                    const selectedChks = container.querySelectorAll('input.supply-tina-chk:checked');
+                    selectedTinas = Array.from(selectedChks).map(chk => chk.value);
+                }
 
-                // Clear/Reset immediately
-                document.getElementById('add-supply-form').reset();
-                document.getElementById('supply-date').value = todayStr;
-                container.querySelectorAll('.collab-select-card[data-prefix="supply"]').forEach(c => c.classList.remove('selected'));
-                container.querySelectorAll('.tina-select-card[data-prefix="supply"]').forEach(c => c.classList.remove('selected'));
-                
-                // Show dynamic area again since action resets to "Utilización"
-                supplyFeedingDetails.classList.remove('hidden');
+                try {
+                    const supId = `SUP_${Date.now()}`;
+                    const supplyCategory = document.getElementById('supply-category').value;
+                    const supplyName = document.getElementById('supply-name').value.trim();
+                    const supplyQty = parseFloat(document.getElementById('supply-qty').value);
+                    const supplyUnit = document.getElementById('supply-unit').value;
+                    const supplyDate = document.getElementById('supply-date').value;
+                    const supplyCost = parseFloat(document.getElementById('supply-cost').value) || 0;
+                    const supplySize = document.getElementById('supply-size').value;
 
-                // Redirect immediately
-                window.location.hash = '#supplies';
+                    // Validation to prevent negative stock on Utilización (only online)
+                    if (supplyAction === 'Utilización' && navigator.onLine) {
+                        try {
+                            const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
+                            let currentStock = 0;
+                            let unit = '';
+                            supplyRows.slice(1).forEach(row => {
+                                const name = row[3] ? row[3].trim().toLowerCase() : '';
+                                if (name === supplyName.toLowerCase()) {
+                                    const act = row[4];
+                                    const qty = parseFloat(row[5]) || 0;
+                                    unit = row[6] || 'kg';
+                                    if (act === 'Adición') currentStock += qty;
+                                    else if (act === 'Utilización') currentStock -= qty;
+                                }
+                            });
 
-                // Dispatch background submission
-                executeBackgroundSubmit('add-supply', payload, () => submitSupplyData(payload));
+                            if (supplyQty > currentStock) {
+                                alert(`Error: No hay suficiente stock en bodega para esta utilización.\nStock actual de "${supplyName}": ${currentStock.toFixed(2)} ${unit}.\nCantidad solicitada: ${supplyQty.toFixed(2)} ${unit}.`);
+                                return;
+                            }
+                        } catch (stockErr) {
+                            console.warn("Fallo al verificar stock en bodega, ignorando check offline:", stockErr);
+                        }
+                    }
 
-            } catch (err) {
-                console.error("Supply submit error", err);
-                showToast(`Error al registrar bodega: ${err.message}`, "error");
-            }
-        });
+                    // Collaborators metadata
+                    const selectedCollabs = Array.from(container.querySelectorAll('input.supply-collab-chk:checked')).map(cb => cb.value);
+                    let collabMeta = '';
+                    if (selectedCollabs.length > 0) {
+                        collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
+                    }
+
+                    const supplyValues = [[
+                        supId,
+                        'MANUAL',
+                        supplyDate,
+                        supplyName,
+                        supplyAction,
+                        supplyQty,
+                        supplyUnit,
+                        supplyCost,
+                        supplyCategory,
+                        supplySize
+                    ]];
+
+                    // If Action is Utilización and N > 0 tinas selected, write feeding logs
+                    let feedingRows = [];
+                    if (supplyAction === 'Utilización' && selectedTinas.length > 0) {
+                        const qtyPerTina = supplyQty / selectedTinas.length;
+
+                        let nextOrder = 1;
+                        if (navigator.onLine) {
+                            try {
+                                const allLogs = await GoogleAPI.getFeedingLogs();
+                                const todayLogs = allLogs.slice(1).filter(log => log[2] && log[2].startsWith(supplyDate));
+                                nextOrder = todayLogs.length + 1;
+                            } catch (e) {
+                                console.warn("No se pudo consultar logs de alimentación", e);
+                            }
+                        }
+
+                        const nowTime = new Date().toTimeString().split(' ')[0]; // HH:MM:SS
+                        const formattedDate = `${supplyDate} ${nowTime}`;
+
+                        feedingRows = selectedTinas.map(tinaId => {
+                            const trayObj = camas.find(c => c[0] === tinaId);
+                            const tinaCiclo = (trayObj && trayObj[3]) ? trayObj[3].toString().trim() : 'Ciclo Legacy';
+                            const row = [
+                                `FEED_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+                                tinaId,
+                                formattedDate,
+                                nextOrder,
+                                supplyName,
+                                qtyPerTina,
+                                GoogleAPI.user.name,
+                                `Alimentación manual vía Movimiento de Insumo ${supId} (${supplyUnit}) ${collabMeta}`,
+                                tinaCiclo // 9th column
+                            ];
+                            nextOrder++;
+                            return row;
+                        });
+                    }
+
+                    // If supply has cost, auto-generate a financial record of Gasto
+                    let financeValues = [];
+                    if (supplyCost > 0) {
+                        let finDesc = `${collabMeta}Compra auto-registrada de ${supplyQty} ${supplyUnit} de ${supplyName} (${supplySize})`;
+                        const finId = `FIN_${Date.now()}_SUP`;
+                        financeValues = [[
+                            finId,
+                            'MANUAL',
+                            supplyDate,
+                            'Gasto',
+                            'Operativo: Compra de Insumos',
+                            supplyCost,
+                            finDesc
+                        ]];
+                    }
+
+                    const payload = {
+                        supplyValues,
+                        feedingRows,
+                        financeValues
+                    };
+
+                    // Clear/Reset immediately
+                    addSupplyForm.reset();
+                    const supplyDateEl = document.getElementById('supply-date');
+                    if (supplyDateEl) supplyDateEl.value = todayStr;
+                    container.querySelectorAll('.collab-select-card[data-prefix="supply"]').forEach(c => c.classList.remove('selected'));
+                    container.querySelectorAll('.tina-select-card[data-prefix="supply"]').forEach(c => c.classList.remove('selected'));
+                    
+                    // Show dynamic area again since action resets to "Utilización"
+                    if (supplyFeedingDetails) supplyFeedingDetails.classList.remove('hidden');
+
+                    // Redirect immediately
+                    window.location.hash = '#supplies';
+
+                    // Dispatch background submission
+                    executeBackgroundSubmit('add-supply', payload, () => submitSupplyData(payload));
+
+                } catch (err) {
+                    console.error("Supply submit error", err);
+                    showToast(`Error al registrar bodega: ${err.message}`, "error");
+                }
+            });
+        }
 
         // FORM SUBMIT 4: MACHINERY (Tools)
         const addMachineryForm = document.getElementById('add-machinery-form');
@@ -1823,7 +1873,7 @@ const Components = {
         container.innerHTML = `<div class="text-center py-5"><div class="bio-spinner"></div><p>Cargando bitácora diaria...</p></div>`;
 
         try {
-            const reportRows = await GoogleAPI.getSheetData('Reportes!A:F');
+            const reportRows = await GoogleAPI.getSheetData('Reportes!A:G');
             const financeRows = await GoogleAPI.getSheetData('Finanzas!A:G');
             const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
 
@@ -1948,10 +1998,10 @@ const Components = {
                         showLoading("Eliminando registro y respaldando auditoría...");
                         try {
                             // 1. Fetch data from sheets to find original content
-                            const reportRows = await GoogleAPI.getSheetData('Reportes!A:F');
+                            const reportRows = await GoogleAPI.getSheetData('Reportes!A:G');
                             const financeRows = await GoogleAPI.getSheetData('Finanzas!A:G');
                             const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
-                            const feedingRows = await GoogleAPI.getSheetData('Registro_Alimentacion!A:H');
+                            const feedingRows = await GoogleAPI.getSheetData('Registro_Alimentacion!A:I');
 
                             // Find report row index
                             const repIdx = reportRows.findIndex(row => row[0] === repId);
@@ -1963,7 +2013,7 @@ const Components = {
                                 await GoogleAPI.logDeletion('Reportes', repId, repRow[1], repDetail, reason);
                                 
                                 // Clear report row from Sheet (rowNumber is idx + 1)
-                                await GoogleAPI.clearSheetRange(`Reportes!A${repIdx + 1}:F${repIdx + 1}`);
+                                await GoogleAPI.clearSheetRange(`Reportes!A${repIdx + 1}:G${repIdx + 1}`);
                             }
 
                             // Find and delete any linked finance transactions
@@ -2487,7 +2537,7 @@ const Components = {
                                     <div class="form-row-2">
                                         <div class="form-group">
                                             <label class="form-label" for="m-supply-qty">Cantidad</label>
-                                            <input type="number" id="m-supply-qty" class="form-control" step="0.1" required>
+                                            <input type="number" inputmode="decimal" id="m-supply-qty" class="form-control" step="0.1" required>
                                         </div>
                                         <div class="form-group">
                                             <label class="form-label" for="m-supply-unit">Unidad</label>
@@ -2615,26 +2665,36 @@ const Components = {
         }
     },
 
-    /**
-     * Render 6. Control y Alimentación de Camas (BSF)
-     */
     async renderFeeding(containerId, showLoading, hideLoading) {
         const container = document.getElementById(containerId);
-        container.innerHTML = `<div class="text-center py-5"><div class="bio-spinner"></div><p>Cargando control de tinas...</p></div>`;
+        container.innerHTML = `<div class="text-center py-5"><div class="bio-spinner"></div><p>Cargando control de bandejas...</p></div>`;
 
         try {
-            // 1. Fetch Camas (Tinas) and Feeding Logs
+            // 1. Fetch Camas (Tinas), Feeding Logs, and Stage Logs
             const camasRows = await GoogleAPI.getCamas();
             const feedingRows = await GoogleAPI.getFeedingLogs();
+            const stagesRows = await GoogleAPI.getEtapasLogs();
 
             const camas = camasRows.slice(1).filter(row => row[0]); // Skip headers
             const logs = feedingRows.slice(1).filter(row => row[0]);
+            const stages = stagesRows.slice(1).filter(row => row[0]);
 
-            // Extract unique Group names from Camas list (Column 5/Index 4)
+            // Map each tray's latest stage from Registro_Etapas
+            const latestStageMap = {};
+            stages.forEach(log => {
+                const tinaId = log[1];
+                const newStage = log[4];
+                latestStageMap[tinaId] = newStage;
+            });
+
+            // Extract unique active group names
             const groupsSet = new Set();
             camas.forEach(c => {
-                const group = c[4] ? c[4].trim() : 'Sin Grupo';
-                groupsSet.add(group);
+                const status = c[1];
+                const group = c[2] ? c[2].trim() : '';
+                if (status === 'En Servicio' && group) {
+                    groupsSet.add(group);
+                }
             });
             const uniqueGroups = Array.from(groupsSet).sort();
 
@@ -2647,172 +2707,167 @@ const Components = {
             // Filter today's feeding logs to compute bed states
             const todayLogs = logs.filter(log => log[2] && log[2].startsWith(todayStr));
             
-            // Map today's logs by Bed ID to easily check if fed today
+            // Map today's logs by Bed ID
             const todayFeedMap = {};
             todayLogs.forEach(log => {
                 const bedId = log[1];
-                const dateTimeStr = log[2]; // YYYY-MM-DD HH:MM:SS
+                const dateTimeStr = log[2];
                 const orderNum = log[3];
                 const insumo = log[4];
                 const qty = log[5];
-                
                 const time = dateTimeStr.split(' ')[1] ? dateTimeStr.split(' ')[1].substring(0, 5) : '';
                 todayFeedMap[bedId] = { time, orderNum, insumo, qty };
             });
 
-            // If zero beds exist, render setup placeholder
-            if (camas.length === 0) {
-                container.innerHTML = `
-                    <div class="card text-center p-5 slide-in-view">
-                        <i class="fa-solid fa-shuttle-space text-secondary" style="font-size: 3.5rem; margin-bottom: 1.5rem;"></i>
-                        <h3>No hay tinas registradas en el sistema</h3>
-                        <p class="mb-4">Para comenzar a registrar alimentaciones, primero debes dar de alta las tinas de tu criadero.</p>
-                        ${(GoogleAPI.user.role === 'Socio' || GoogleAPI.user.role === 'Administrador') ? `
-                            <button id="btn-open-creator-first" class="btn btn-primary"><i class="fa-solid fa-wand-magic-sparkles"></i> Crear Tinas en Rango</button>
-                        ` : '<p class="text-warning">Solo los administradores y socios pueden crear tinas en el sistema.</p>'}
-                    </div>
-
-                    <!-- Creation Modal Container (Placeholder) -->
-                    <div id="cama-create-modal" class="modal-overlay hidden"></div>
-                `;
-
-                if (GoogleAPI.user.role === 'Socio' || GoogleAPI.user.role === 'Administrador') {
-                    document.getElementById('btn-open-creator-first').addEventListener('click', () => {
-                        this.showCamaCreatorModal(containerId, showLoading, hideLoading);
-                    });
-                }
-                return;
-            }
-
-            const enabledCamas = camas.filter(c => c[3] !== 'Inactivo');
-            const inactiveCount = camas.length - enabledCamas.length;
+            const isSocioOrAdmin = (GoogleAPI.user.role === 'Socio' || GoogleAPI.user.role === 'Administrador');
 
             // Render Core UI Frame with Sub-tabs
             container.innerHTML = `
                 <div class="slide-in-view">
-                    <!-- Main sub-tabs for Control de Tinas -->
+                    <!-- Main sub-tabs for Control de Bandejas -->
                     <div class="filter-tabs mb-3" id="feeding-main-tabs" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <span class="filter-tab active" data-tab="tinas-grid" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-border-all"></i> Tinas Activas</span>
+                        <span class="filter-tab active" data-tab="tinas-grid" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-border-all"></i> Bandejas Activas</span>
+                        <span class="filter-tab" data-tab="armar-lote" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-square-plus"></i> Armar Lote</span>
+                        ${isSocioOrAdmin ? `
+                        <span class="filter-tab" data-tab="inventario-activos" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-boxes-stacked"></i> Inventario de Activos</span>
+                        ` : ''}
                         <span class="filter-tab" data-tab="feeding-history" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-clock-rotate-left"></i> Historial de Alimentación</span>
                     </div>
                     
                     <!-- Content sections wrapper -->
                     <div id="feeding-tabs-content">
-                        <!-- SECTION A: TINAS GRID (ACTIVE) -->
+                        <!-- VISTA 3: BANDEJAS ACTIVAS -->
                         <div id="tinas-grid-section">
-                            <!-- Filter bar by Stage and Group -->
-                            <div class="camas-filter-bar">
-                                <div class="filter-tabs" id="cama-stage-tabs">
-                                    <span class="filter-tab active" data-stage="Todas">Todas (${enabledCamas.length})</span>
-                                    <span class="filter-tab" data-stage="Neonatos">Neonatos</span>
-                                    <span class="filter-tab" data-stage="Pequeña">Pequeña</span>
-                                    <span class="filter-tab" data-stage="Mediana">Mediana</span>
-                                    <span class="filter-tab" data-stage="Grande">Grande</span>
-                                    <span class="filter-tab" data-stage="Prepupa">Prepupa</span>
-                                    <span class="filter-tab" data-stage="Disponible">Disponibles</span>
-                                    <span class="filter-tab" data-stage="Inactivas" style="border-left: 1px solid var(--border-color); padding-left: 1rem; margin-left: 0.5rem; color: var(--text-warning);"><i class="fa-solid fa-power-off"></i> Por Habilitar (${inactiveCount})</span>
-                                </div>
-
-                                <div class="d-flex gap-2 align-items-center flex-wrap">
-                                    <div class="form-group mb-0" style="margin-bottom: 0; min-width: 170px;">
-                                        <select id="filter-group-select" class="form-control" style="padding: 0.5rem; font-size: 0.85rem;">
-                                            <option value="Todos">-- Todos los Grupos --</option>
-                                            ${uniqueGroups.map(g => `<option value="${g}">${g}</option>`).join('')}
-                                        </select>
-                                    </div>
-
-                                    ${(GoogleAPI.user.role === 'Socio' || GoogleAPI.user.role === 'Administrador') ? `
-                                        <button id="btn-open-cama-creator" class="btn btn-outline btn-sm" style="height: 38px;">
-                                            <i class="fa-solid fa-plus"></i> Configurar Tinas
-                                        </button>
-                                    ` : ''}
-                                </div>
-                            </div>
-
-                            <!-- Search, Hide Fed checkbox, Select All -->
-                            <div class="card p-3 mb-3" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between;">
-                                <div class="form-group mb-0" style="flex-grow: 1; max-width: 400px; margin-bottom: 0;">
-                                    <input type="text" id="search-cama-input" class="form-control" placeholder="Buscar tina por ID o Nombre... (ej. Tina 25)">
+                            <div class="camas-filter-bar mb-3" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+                                <div class="form-group mb-0" style="margin-bottom: 0; min-width: 200px; flex-grow: 1; max-width: 400px;">
+                                    <input type="text" id="search-cama-input" class="form-control" placeholder="Buscar por ID o Lote... (ej. B-001)">
                                 </div>
                                 <div style="display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;">
                                     <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem; margin-bottom: 0;">
                                         <input type="checkbox" id="toggle-hide-fed" style="width: 17px; height: 17px; accent-color: var(--brand-primary);">
                                         Ocultar alimentadas hoy
                                     </label>
-                                    <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem; margin-bottom: 0;">
-                                        <input type="checkbox" id="toggle-select-all" style="width: 17px; height: 17px; accent-color: var(--brand-primary);">
-                                        Seleccionar filtradas
-                                    </label>
                                 </div>
                             </div>
-
-                            <!-- Tinas Grid -->
-                            <div class="camas-grid" id="camas-grid-container"></div>
+                            <div id="camas-grid-container"></div>
                         </div>
 
-                        <!-- SECTION B: FEEDING HISTORY -->
+                        <!-- VISTA 2: ARMAR LOTE -->
+                        <div id="armar-lote-section" class="hidden">
+                            <div class="card p-3 mb-3">
+                                <h4 class="mb-3 text-success"><i class="fa-solid fa-square-plus"></i> Crear Nuevo Lote de Producción</h4>
+                                <form id="form-start-batch" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+                                    <div class="form-group mb-0" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+                                        <label class="form-label" for="batch-group-name">Nombre del Lote / Grupo</label>
+                                        <input type="text" id="batch-group-name" class="form-control" placeholder="Ej: Lote A, Estante 3" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary" style="height: 42px;">
+                                        <i class="fa-solid fa-play"></i> Iniciar Lote con Seleccionadas
+                                    </button>
+                                </form>
+                            </div>
+                            <div class="card p-3 mb-3" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                                <div class="form-group mb-0" style="flex: 1; max-width: 300px; margin-bottom: 0;">
+                                    <input type="text" id="search-disponible-input" class="form-control" placeholder="Buscar disponible por ID...">
+                                </div>
+                                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem; margin-bottom: 0;">
+                                    <input type="checkbox" id="toggle-select-all-disponibles" style="width: 17px; height: 17px; accent-color: var(--brand-primary);">
+                                    Seleccionar todas las disponibles
+                                </label>
+                            </div>
+                            <div class="camas-grid" id="disponibles-grid-container"></div>
+                        </div>
+
+                        <!-- VISTA 1: INVENTARIO DE ACTIVOS (ADMIN) -->
+                        ${isSocioOrAdmin ? `
+                        <div id="inventario-activos-section" class="hidden">
+                            <div class="card p-3 mb-3">
+                                <h4 class="mb-3 text-success"><i class="fa-solid fa-boxes-stacked"></i> Alta Secuencial de Bandejas</h4>
+                                <form id="form-manage-assets" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) auto; gap: 1rem; align-items: flex-end;">
+                                    <div class="form-group mb-0" style="margin-bottom: 0;">
+                                        <label class="form-label" for="asset-prefix">Prefijo</label>
+                                        <input type="text" id="asset-prefix" class="form-control" value="B-" placeholder="Ej: B-" required>
+                                    </div>
+                                    <div class="form-group mb-0" style="margin-bottom: 0;">
+                                        <label class="form-label" for="asset-start">Inicio Secuencia</label>
+                                        <input type="number" id="asset-start" class="form-control" value="1" min="1" required>
+                                    </div>
+                                    <div class="form-group mb-0" style="margin-bottom: 0;">
+                                        <label class="form-label" for="asset-end">Fin Secuencia</label>
+                                        <input type="number" id="asset-end" class="form-control" value="48" min="1" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary" style="height: 42px;">
+                                        <i class="fa-solid fa-plus"></i> Dar de Alta
+                                    </button>
+                                </form>
+                            </div>
+                            <div class="card">
+                                <h4 class="mb-3"><i class="fa-solid fa-list"></i> Listado Total de Bandejas</h4>
+                                <div class="table-responsive">
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>ID Bandeja</th>
+                                                <th>Estado</th>
+                                                <th>Lote Actual / Grupo</th>
+                                                <th>Acción</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="assets-table-body"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <!-- SECCIÓN HISTORIAL -->
                         <div id="feeding-history-section" class="hidden">
                             <div class="card p-3 mb-3">
                                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                                     <div class="filter-tabs" id="history-view-tabs" style="border: none; margin-bottom: 0; display: flex; gap: 0.5rem;">
                                         <span class="filter-tab active" data-view="all-feedings" style="cursor: pointer; padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.85rem;"><i class="fa-solid fa-list-ol"></i> Ver por Alimentaciones</span>
-                                        <span class="filter-tab" data-view="by-tina" style="cursor: pointer; padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.85rem;"><i class="fa-solid fa-filter"></i> Ver por Número de Tina</span>
+                                        <span class="filter-tab" data-view="by-tina" style="cursor: pointer; padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.85rem;"><i class="fa-solid fa-filter"></i> Ver por Número de Bandeja</span>
                                     </div>
-                                    
-                                    <!-- Selector de Tina (Oculto al inicio) -->
                                     <div id="history-tina-selector-wrapper" class="hidden" style="display: flex; align-items: center; gap: 0.5rem;">
-                                        <label for="history-tina-select" class="form-label mb-0" style="font-size: 0.85rem; margin-bottom: 0; white-space: nowrap;">Seleccionar Tina:</label>
+                                        <label for="history-tina-select" class="form-label mb-0" style="font-size: 0.85rem; margin-bottom: 0; white-space: nowrap;">Seleccionar Bandeja:</label>
                                         <select id="history-tina-select" class="form-control" style="padding: 0.35rem 0.5rem; font-size: 0.85rem; width: 180px;">
-                                            <option value="">-- Seleccionar Tina --</option>
-                                            ${camas.map(c => `<option value="${c[0]}">${c[1].replace('Cama', 'Tina')} (${c[0]})</option>`).join('')}
+                                            <option value="">-- Seleccionar --</option>
+                                            ${camas.map(c => `<option value="${c[0]}">Bandeja ${c[0]}</option>`).join('')}
                                         </select>
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- Listado del historial -->
                             <div id="feeding-history-list-container"></div>
                         </div>
                     </div>
 
                     <!-- Floating Batch Action Bar -->
                     <div id="batch-action-bar" class="batch-action-bar hidden">
-                        <span class="batch-action-text" id="batch-selected-count">0 tinas seleccionadas</span>
+                        <span class="batch-action-text" id="batch-selected-count">0 bandejas seleccionadas</span>
                         <button id="btn-batch-feed" class="btn btn-primary btn-sm">
-                            <i class="fa-solid fa-seedling"></i> Alimentar Tinas
+                            <i class="fa-solid fa-seedling"></i> Alimentar Selección
                         </button>
                     </div>
 
-                    <!-- Creation Modal Container -->
-                    <div id="cama-create-modal" class="modal-overlay hidden"></div>
-
-                    <!-- Feeding Form Modal Container -->
+                    <!-- Modals -->
                     <div id="cama-feed-modal" class="modal-overlay hidden"></div>
-                    
-                    <!-- Tina Detail Modal Container -->
                     <div id="tina-detail-modal" class="modal-overlay hidden"></div>
                 </div>
             `;
 
-            // Setup Event Listeners and render initial grid
-            this.setupCamasControls(containerId, camas, logs, todayFeedMap, showLoading, hideLoading);
+            // Setup Event Listeners and render initial states
+            this.setupCamasControls(containerId, camas, logs, todayFeedMap, latestStageMap, showLoading, hideLoading);
 
         } catch (err) {
             console.error("Feeding view render error", err);
-            container.innerHTML = `<div class="card p-5 text-center"><p class="text-danger">Error al cargar panel de tinas: ${err.message}</p></div>`;
+            container.innerHTML = `<div class="card p-5 text-center"><p class="text-danger">Error al cargar panel de bandejas: ${err.message}</p></div>`;
         }
     },
 
-    /**
-     * Bind controls, search filtering, tabs, checkboxes and dynamic grid updates
-     */
-    setupCamasControls(containerId, camas, logs, todayFeedMap, showLoading, hideLoading) {
-        const grid = document.getElementById('camas-grid-container');
+    setupCamasControls(containerId, camas, logs, todayFeedMap, latestStageMap, showLoading, hideLoading) {
+        const gridContainer = document.getElementById('camas-grid-container');
         const searchInput = document.getElementById('search-cama-input');
         const hideFedCheckbox = document.getElementById('toggle-hide-fed');
-        const selectAllCheckbox = document.getElementById('toggle-select-all');
-        const stageTabs = document.querySelectorAll('#cama-stage-tabs .filter-tab');
-        const groupSelect = document.getElementById('filter-group-select');
         const batchBar = document.getElementById('batch-action-bar');
         const batchCount = document.getElementById('batch-selected-count');
         const batchFeedBtn = document.getElementById('btn-batch-feed');
@@ -2820,6 +2875,8 @@ const Components = {
         // Sub-tabs navigation
         const mainTabs = document.querySelectorAll('#feeding-main-tabs .filter-tab');
         const gridSection = document.getElementById('tinas-grid-section');
+        const armarLoteSection = document.getElementById('armar-lote-section');
+        const inventarioSection = document.getElementById('inventario-activos-section');
         const historySection = document.getElementById('feeding-history-section');
         const historyContainer = document.getElementById('feeding-history-list-container');
         const historyViewTabs = document.querySelectorAll('#history-view-tabs .filter-tab');
@@ -2827,68 +2884,76 @@ const Components = {
         const tinaSelect = document.getElementById('history-tina-select');
 
         let selectedBeds = new Set();
-        let currentFilterStage = 'Todas';
-        let currentFilterGroup = 'Todos';
+        let selectedDisponibles = new Set();
         let currentSearchQuery = '';
+        let currentDisponibleSearch = '';
         let currentHideFed = false;
         let currentHistoryView = 'all-feedings'; // 'all-feedings' or 'by-tina'
 
-        // Admin bed creator button binding
-        const creatorBtn = document.getElementById('btn-open-cama-creator');
-        if (creatorBtn) {
-            creatorBtn.addEventListener('click', () => {
-                this.showCamaCreatorModal(containerId, showLoading, hideLoading);
+        // Main sub-tabs handler
+        if (mainTabs && mainTabs.length > 0) {
+            mainTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    mainTabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    
+                    const selectedTab = tab.getAttribute('data-tab');
+                    if (gridSection) gridSection.classList.add('hidden');
+                    if (armarLoteSection) armarLoteSection.classList.add('hidden');
+                    if (inventarioSection) inventarioSection.classList.add('hidden');
+                    if (historySection) historySection.classList.add('hidden');
+                    if (batchBar) batchBar.classList.add('hidden');
+
+                    if (selectedTab === 'tinas-grid') {
+                        if (gridSection) gridSection.classList.remove('hidden');
+                        drawGrid();
+                        updateBatchBar();
+                    } else if (selectedTab === 'armar-lote') {
+                        if (armarLoteSection) armarLoteSection.classList.remove('hidden');
+                        drawDisponibles();
+                    } else if (selectedTab === 'inventario-activos') {
+                        if (inventarioSection) inventarioSection.classList.remove('hidden');
+                        drawAssetsTable();
+                    } else if (selectedTab === 'feeding-history') {
+                        if (historySection) historySection.classList.remove('hidden');
+                        drawHistory();
+                    }
+                });
             });
         }
 
-        // Main sub-tabs handler
-        mainTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                mainTabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                
-                const selectedTab = tab.getAttribute('data-tab');
-                if (selectedTab === 'tinas-grid') {
-                    gridSection.classList.remove('hidden');
-                    historySection.classList.add('hidden');
-                    updateBatchBar();
-                } else {
-                    gridSection.classList.add('hidden');
-                    historySection.classList.remove('hidden');
-                    batchBar.classList.add('hidden'); // Ocultar barra de lote en historial
-                    drawHistory();
-                }
-            });
-        });
-
         // History sub-tabs handler
-        historyViewTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                historyViewTabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                currentHistoryView = tab.getAttribute('data-view');
-                
-                if (currentHistoryView === 'all-feedings') {
-                    tinaSelectorWrapper.classList.add('hidden');
-                    drawHistory();
-                } else {
-                    tinaSelectorWrapper.classList.remove('hidden');
-                    drawHistory();
-                }
+        if (historyViewTabs && historyViewTabs.length > 0) {
+            historyViewTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    historyViewTabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentHistoryView = tab.getAttribute('data-view');
+                    
+                    if (currentHistoryView === 'all-feedings') {
+                        if (tinaSelectorWrapper) tinaSelectorWrapper.classList.add('hidden');
+                        drawHistory();
+                    } else {
+                        if (tinaSelectorWrapper) tinaSelectorWrapper.classList.remove('hidden');
+                        drawHistory();
+                    }
+                });
             });
-        });
+        }
 
-        tinaSelect.addEventListener('change', () => {
-            drawHistory();
-        });
+        if (tinaSelect) {
+            tinaSelect.addEventListener('change', () => {
+                drawHistory();
+            });
+        }
 
         // Draw feeding history records
         const drawHistory = () => {
+            if (!historyContainer) return;
             if (currentHistoryView === 'all-feedings') {
-                // List ALL feeding records sorted by date/time registration desc
                 const sortedLogs = [...logs].sort((a, b) => new Date(b[2].replace(' ', 'T')) - new Date(a[2].replace(' ', 'T')));
                 if (sortedLogs.length === 0) {
-                    historyContainer.innerHTML = `<div class="card p-4 text-center text-secondary">No hay alimentaciones registradas en la base de datos.</div>`;
+                    historyContainer.innerHTML = `<div class="card p-4 text-center text-secondary">No hay alimentaciones registradas.</div>`;
                     return;
                 }
                 
@@ -2900,7 +2965,7 @@ const Components = {
                                 <thead>
                                     <tr>
                                         <th>Fecha / Hora</th>
-                                        <th>Tina</th>
+                                        <th>Bandeja</th>
                                         <th>Alimento</th>
                                         <th>Cantidad</th>
                                         <th>Operario</th>
@@ -2910,9 +2975,9 @@ const Components = {
                                 <tbody>
                                     ${sortedLogs.map(row => {
                                         const camaId = row[1];
-                                        const details = camas.find(c => c[0] === camaId) || [camaId, camaId];
-                                        const name = details[1].replace('Cama', 'Tina');
+                                        const name = "Bandeja " + camaId;
                                         const feedUnit = getFeedingUnit(row[7]);
+                                        const cycle = row[8] || 'Ciclo Legacy';
                                         return `
                                             <tr>
                                                 <td><strong>${row[2]}</strong></td>
@@ -2921,6 +2986,7 @@ const Components = {
                                                           onclick="Components.showTinaDetailModal('${camaId}')">
                                                         ${name}
                                                     </span>
+                                                    <br><small class="text-secondary" style="font-size: 0.7rem;">Ciclo: ${cycle.split('-')[0]}</small>
                                                 </td>
                                                 <td>${row[4]}</td>
                                                 <td><strong>${parseFloat(row[5]).toFixed(2)} ${feedUnit}</strong></td>
@@ -2935,23 +3001,20 @@ const Components = {
                     </div>
                 `;
             } else {
-                // Filter by selected Tina
+                if (!tinaSelect) return;
                 const selectedTinaId = tinaSelect.value;
                 if (!selectedTinaId) {
-                    historyContainer.innerHTML = `<div class="card p-4 text-center text-secondary">Por favor, selecciona una tina del selector superior para visualizar sus alimentaciones.</div>`;
+                    historyContainer.innerHTML = `<div class="card p-4 text-center text-secondary">Por favor, selecciona una bandeja para visualizar sus alimentaciones.</div>`;
                     return;
                 }
                 
                 const tinaLogs = logs.filter(row => row[1] === selectedTinaId);
                 const sortedLogs = [...tinaLogs].sort((a, b) => new Date(b[2].replace(' ', 'T')) - new Date(a[2].replace(' ', 'T')));
                 
-                const details = camas.find(c => c[0] === selectedTinaId) || [selectedTinaId, selectedTinaId];
-                const name = details[1].replace('Cama', 'Tina');
-                
                 if (sortedLogs.length === 0) {
                     historyContainer.innerHTML = `
                         <div class="card p-4 text-center text-secondary">
-                            No se han registrado alimentaciones todavía para la <strong>${name} (${selectedTinaId})</strong>.
+                            No se han registrado alimentaciones todavía para la <strong>Bandeja ${selectedTinaId}</strong>.
                         </div>
                     `;
                     return;
@@ -2959,7 +3022,7 @@ const Components = {
                 
                 historyContainer.innerHTML = `
                     <div class="card">
-                        <h4 class="mb-3"><i class="fa-solid fa-shuttle-space text-success"></i> Alimentaciones de ${name} (${selectedTinaId})</h4>
+                        <h4 class="mb-3"><i class="fa-solid fa-shuttle-space text-success"></i> Alimentaciones de Bandeja ${selectedTinaId}</h4>
                         <div class="table-responsive">
                             <table class="table">
                                 <thead>
@@ -2992,123 +3055,96 @@ const Components = {
             }
         };
 
-        // Render function based on current filters
+        // VISTA 3: Render Active grouped by Grupo_Actual
         const drawGrid = () => {
-            const filteredCamas = camas.filter(c => {
+            if (!gridContainer) return;
+            const activeCamas = camas.filter(c => c[1] === 'En Servicio');
+            
+            const filtered = activeCamas.filter(c => {
                 const id = c[0];
-                const stage = c[2];
-                const status = c[3]; // 'Activo'/'Inactivo'/'Disponible'
-                const group = c[4] ? c[4].trim() : 'Sin Grupo';
-
-                // Handle Inactivas tab filter
-                if (currentFilterStage === 'Inactivas') {
-                    if (status !== 'Inactivo') return false;
-                } else {
-                    if (status === 'Inactivo') return false;
-                    
-                    // Handle stage and status filtering
-                    if (currentFilterStage === 'Disponible') {
-                        if (status !== 'Disponible') return false;
-                    } else if (currentFilterStage !== 'Todas') {
-                        if (stage !== currentFilterStage || status !== 'Activo') return false;
-                    }
-                }
-
-                if (currentFilterGroup !== 'Todos' && group !== currentFilterGroup) return false;
-
+                const group = c[2] || 'Sin Grupo';
                 const isFed = todayFeedMap[id];
-                if (currentHideFed && (isFed || status === 'Disponible')) return false;
-
+                
+                if (currentHideFed && isFed) return false;
+                
                 if (currentSearchQuery) {
                     const searchLower = currentSearchQuery.toLowerCase();
-                    const matchId = id.toLowerCase().includes(searchLower);
-                    const matchName = c[1].toLowerCase().includes(searchLower);
-                    if (!matchId && !matchName) return false;
+                    if (!id.toLowerCase().includes(searchLower) && !group.toLowerCase().includes(searchLower)) return false;
                 }
-
                 return true;
             });
 
-            // If empty grid
-            if (filteredCamas.length === 0) {
-                grid.innerHTML = `<div style="grid-column: 1 / -1;" class="text-center py-5 text-secondary"><i class="fa-solid fa-magnifying-glass mb-2" style="font-size: 2rem;"></i><p>No se encontraron tinas con los filtros activos.</p></div>`;
-                selectAllCheckbox.checked = false;
+            if (filtered.length === 0) {
+                gridContainer.innerHTML = `<div class="text-center py-5 text-secondary"><i class="fa-solid fa-magnifying-glass mb-2" style="font-size: 2rem;"></i><p>No se encontraron bandejas activas con los filtros aplicados.</p></div>`;
                 return;
             }
 
-            // Map and generate HTML
-            grid.innerHTML = filteredCamas.map(c => {
-                const id = c[0];
-                const name = c[1].replace('Cama', 'Tina');
-                const stage = c[2];
-                const status = c[3]; // 'Activo'/'Inactivo'/'Disponible'
-                const isFed = todayFeedMap[id];
-                const isChecked = selectedBeds.has(id);
+            // Group by Grupo_Actual
+            const groups = {};
+            filtered.forEach(c => {
+                const groupName = c[2] || 'Sin Lote';
+                if (!groups[groupName]) groups[groupName] = [];
+                groups[groupName].push(c);
+            });
 
-                if (status === 'Inactivo') {
-                    return `
-                        <div class="cama-card pending" data-id="${id}" style="cursor: pointer; border: 1px solid rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.02); opacity: 0.85;">
-                            <div style="width: 17px; height: 17px;"></div>
-                            <div class="cama-number" style="color: var(--text-secondary);">${name}</div>
-                            <span class="cama-badge" style="background-color: rgba(239, 68, 68, 0.15); color: #ef4444;">Inhabilitada</span>
-                            <div class="cama-status-indicator" style="color: var(--text-secondary);">
-                                <i class="fa-solid fa-circle-xmark" style="color: #ef4444;"></i>
-                                <span>Fuera de servicio</span>
-                            </div>
-                            <button class="btn btn-outline btn-sm btn-enable-tina" data-id="${id}" ${GoogleAPI.user.role === 'Observador' ? 'disabled' : ''} style="position: relative; z-index: 2; border-color: var(--brand-primary); color: var(--brand-primary);">
-                                <i class="fa-solid fa-square-check"></i> Habilitar Tina
-                            </button>
-                        </div>
-                    `;
-                }
-
-                if (status === 'Disponible') {
-                    return `
-                        <div class="cama-card pending" data-id="${id}" style="cursor: pointer; border: 1px dashed var(--border-color); opacity: 0.85;">
-                            <div style="width: 17px; height: 17px;"></div>
-                            <div class="cama-number" style="color: var(--text-secondary);">${name}</div>
-                            <span class="cama-badge disponible">Disponible</span>
-                            <div class="cama-status-indicator" style="color: var(--text-secondary);">
-                                <i class="fa-solid fa-circle-minus"></i>
-                                <span>Vacía (Listo para usar)</span>
-                            </div>
-                            <button class="btn btn-outline btn-sm btn-start-cycle-tina" data-id="${id}" ${GoogleAPI.user.role === 'Observador' ? 'disabled' : ''} style="position: relative; z-index: 2; border-color: var(--brand-primary); color: var(--brand-primary);">
-                                <i class="fa-solid fa-play"></i> Iniciar Ciclo
-                            </button>
-                        </div>
-                    `;
-                }
-
+            gridContainer.innerHTML = Object.keys(groups).map(groupName => {
+                const groupTrays = groups[groupName];
+                const cicloId = groupTrays[0][3] || 'Ciclo Legacy';
                 return `
-                    <div class="cama-card ${isFed ? 'fed' : 'pending'}" data-id="${id}" style="cursor: pointer;">
-                        <input type="checkbox" class="cama-card-checkbox" data-id="${id}" ${isChecked ? 'checked' : ''} style="cursor: pointer; position: relative; z-index: 2;">
-                        <div class="cama-number">${name}</div>
-                        <span class="cama-badge ${stage.toLowerCase().replace(/ /g, '-').replace(/ñ/g, 'n')}">${stage}</span>
-                        <div class="cama-status-indicator ${isFed ? 'fed' : ''}">
-                            ${isFed ? `
-                                <i class="fa-solid fa-circle-check"></i>
-                                <span>Alimentada: ${isFed.time} (${isFed.orderNum}º)</span>
-                            ` : `
-                                <i class="fa-solid fa-circle-minus"></i>
-                                <span>Pendiente hoy</span>
-                            `}
+                    <div class="card p-3 mb-4 group-lot-panel" style="background-color: var(--bg-secondary); border-left: 5px solid var(--brand-primary); margin-bottom: 1.5rem;">
+                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                            <div>
+                                <h3 class="mb-0" style="color: var(--text-success); font-size: 1.15rem; font-weight: 700;">
+                                    <i class="fa-solid fa-layer-group"></i> Lote: ${groupName}
+                                </h3>
+                                <small class="text-secondary" style="font-size: 0.75rem;">Ciclo ID: ${cicloId}</small>
+                            </div>
+                            ${GoogleAPI.user.role !== 'Observador' ? `
+                            <button class="btn btn-xs btn-danger btn-close-batch-group" data-ciclo-id="${cicloId}" data-grupo="${groupName}" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; width: auto; font-weight: bold;">
+                                <i class="fa-solid fa-crop"></i> Cosechar / Cerrar Lote
+                            </button>
+                            ` : ''}
                         </div>
-                        <button class="btn btn-outline btn-sm btn-quick-feed-cama cama-feed-btn" data-id="${id}" ${GoogleAPI.user.role === 'Observador' ? 'disabled' : ''} style="position: relative; z-index: 2;">
-                            <i class="fa-solid fa-seedling"></i> ${isFed ? 'Re-alimentar' : 'Alimentar'}
-                        </button>
+                        <div class="camas-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 0.75rem;">
+                            ${groupTrays.map(c => {
+                                const id = c[0];
+                                const name = "Bandeja " + id;
+                                const stage = latestStageMap[id] || 'Neonatos';
+                                const isFed = todayFeedMap[id];
+                                const isChecked = selectedBeds.has(id);
+                                return `
+                                    <div class="cama-card ${isFed ? 'fed' : 'pending'}" data-id="${id}" style="cursor: pointer; padding: 0.75rem; margin-bottom: 0; min-height: 140px;">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <input type="checkbox" class="cama-card-checkbox" data-id="${id}" ${isChecked ? 'checked' : ''} style="cursor: pointer; z-index: 2;">
+                                            <span class="cama-badge ${stage.toLowerCase().replace(/ /g, '-').replace(/ñ/g, 'n')}" style="font-size: 0.65rem; padding: 0.15rem 0.35rem;">${stage}</span>
+                                        </div>
+                                        <div class="cama-number" style="font-size: 0.95rem; font-weight: bold; margin: 0.4rem 0;">${name}</div>
+                                        <div class="cama-status-indicator" style="font-size: 0.7rem; margin-bottom: 0.5rem;">
+                                            ${isFed ? `
+                                                <i class="fa-solid fa-circle-check" style="color: var(--success);"></i>
+                                                <span>${isFed.time} (${isFed.qty}kg)</span>
+                                            ` : `
+                                                <i class="fa-solid fa-circle-minus" style="color: var(--text-secondary);"></i>
+                                                <span>Pendiente</span>
+                                            `}
+                                        </div>
+                                        <button class="btn btn-outline btn-xs btn-quick-feed-cama" data-id="${id}" ${GoogleAPI.user.role === 'Observador' ? 'disabled' : ''} style="width: 100%; padding: 0.2rem; font-size: 0.7rem; z-index: 2;">
+                                            <i class="fa-solid fa-seedling"></i> Alimentar
+                                        </button>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
                     </div>
                 `;
             }).join('');
 
-            // Wire events inside cards
-            grid.querySelectorAll('.cama-card').forEach(card => {
+            // Wire events inside the active grid
+            gridContainer.querySelectorAll('.cama-card').forEach(card => {
                 const id = card.getAttribute('data-id');
                 const chk = card.querySelector('.cama-card-checkbox');
                 const quickFeedBtn = card.querySelector('.btn-quick-feed-cama');
-                const startCycleBtn = card.querySelector('.btn-start-cycle-tina');
-                const enableTinaBtn = card.querySelector('.btn-enable-tina');
 
-                // Checkbox toggle
                 if (chk) {
                     chk.addEventListener('change', (e) => {
                         e.stopPropagation();
@@ -3118,49 +3154,164 @@ const Components = {
                     });
                 }
 
-                // Clicking card opens the Ficha Técnica detail modal
                 card.addEventListener('click', (e) => {
                     if (e.target.closest('button') || e.target.closest('.cama-card-checkbox')) return;
                     this.showTinaDetailModal(containerId, id, camas, todayFeedMap, showLoading, hideLoading);
                 });
 
-                // Quick feeding button
                 if (quickFeedBtn) {
                     quickFeedBtn.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        if (GoogleAPI.user.role === 'Observador') return;
                         this.showCamaFeedingModal(containerId, [id], todayFeedMap, showLoading, hideLoading, camas);
                     });
                 }
+            });
 
-                // Start cycle button
-                if (startCycleBtn) {
-                    startCycleBtn.addEventListener('click', (e) => {
+            // Bind Cerrar Lote buttons
+            gridContainer.querySelectorAll('.btn-close-batch-group').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    if (GoogleAPI.user.role === 'Observador') return;
+                    
+                    const cicloId = btn.getAttribute('data-ciclo-id');
+                    const grupoName = btn.getAttribute('data-grupo');
+                    
+                    const biomasaStr = prompt(`Cosechar Lote: "${grupoName}"\n\nIngresa los kg totales de biomasa cosechada de este lote:`, "0.0");
+                    if (biomasaStr === null) return; // Cancelled
+                    
+                    const biomasa = parseFloat(biomasaStr);
+                    if (isNaN(biomasa) || biomasa < 0) {
+                        alert("Por favor, ingresa un peso de cosecha válido mayor o igual a 0.");
+                        return;
+                    }
+
+                    showLoading("Cosechando y cerrando lote...");
+                    try {
+                        await GoogleAPI.closeBatch(cicloId, biomasa);
+                        hideLoading();
+                        alert(`¡Lote "${grupoName}" cerrado y cosechado exitosamente! Las bandejas vuelven a estar disponibles.`);
+                        this.renderFeeding(containerId, showLoading, hideLoading);
+                    } catch (err) {
+                        console.error(err);
+                        hideLoading();
+                        alert(`Error al cerrar lote: ${err.message}`);
+                    }
+                });
+            });
+        };
+
+        // VISTA 2: Render Available trays
+        const drawDisponibles = () => {
+            const grid = document.getElementById('disponibles-grid-container');
+            if (!grid) return;
+
+            const disponibles = camas.filter(c => c[1] === 'Disponible');
+            const filtered = disponibles.filter(c => {
+                const id = c[0];
+                if (currentDisponibleSearch) {
+                    return id.toLowerCase().includes(currentDisponibleSearch.toLowerCase());
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div style="grid-column: 1 / -1;" class="text-center py-5 text-secondary"><i class="fa-solid fa-circle-info mb-2" style="font-size: 2rem;"></i><p>No hay bandejas disponibles en este momento.</p></div>`;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(c => {
+                const id = c[0];
+                const name = "Bandeja " + id;
+                const isChecked = selectedDisponibles.has(id);
+                return `
+                    <div class="cama-card pending cursor-pointer" data-id="${id}" style="border: 1px dashed var(--border-color); opacity: 0.9; padding: 0.75rem; min-height: 100px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <input type="checkbox" class="disponible-checkbox" data-id="${id}" ${isChecked ? 'checked' : ''} style="cursor: pointer; z-index: 2;">
+                            <span class="cama-badge disponible" style="font-size: 0.65rem; padding: 0.15rem 0.35rem;">Disponible</span>
+                        </div>
+                        <div class="cama-number" style="font-size: 0.95rem; font-weight: bold; margin: 0.5rem 0;">${name}</div>
+                        <div style="font-size: 0.7rem; color: var(--text-secondary);"><i class="fa-solid fa-circle-check"></i> Vacía y lista</div>
+                    </div>
+                `;
+            }).join('');
+
+            // Wire events
+            grid.querySelectorAll('.cama-card').forEach(card => {
+                const id = card.getAttribute('data-id');
+                const chk = card.querySelector('.disponible-checkbox');
+
+                // PARCHE: Proteger el checkbox antes de asignar el evento
+                if (chk) {
+                    chk.addEventListener('change', (e) => {
                         e.stopPropagation();
-                        this.showTinaDetailModal(containerId, id, camas, todayFeedMap, showLoading, hideLoading);
+                        if (chk.checked) selectedDisponibles.add(id);
+                        else selectedDisponibles.delete(id);
                     });
                 }
 
-                // Enable tina button
-                if (enableTinaBtn) {
-                    enableTinaBtn.addEventListener('click', async (e) => {
-                        e.stopPropagation();
-                        if (GoogleAPI.user.role === 'Observador') return;
-                        
-                        showLoading("Habilitando tina...");
-                        try {
-                            await GoogleAPI.enableTina(id);
-                            hideLoading();
-                            alert(`¡Tina ${id.replace('TIN-', '')} habilitada con éxito! Ahora puedes iniciar su ciclo.`);
-                            
-                            this.renderFeeding(containerId, showLoading, hideLoading); // Re-render
-                        } catch (err) {
-                            console.error(err);
-                            hideLoading();
-                            alert(`Error al habilitar tina: ${err.message}`);
-                        }
-                    });
-                }
+                card.addEventListener('click', (e) => {
+                    if (e.target.closest('.disponible-checkbox')) return;
+                    if (selectedDisponibles.has(id)) {
+                        selectedDisponibles.delete(id);
+                        if (chk) chk.checked = false; // PARCHE
+                    } else {
+                        selectedDisponibles.add(id);
+                        if (chk) chk.checked = true; // PARCHE
+                    }
+                });
+            });
+        };
+
+        // VISTA 1: Render total inventory list (Admin)
+        const drawAssetsTable = () => {
+            const tbody = document.getElementById('assets-table-body');
+            if (!tbody) return;
+
+            if (camas.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center text-secondary">No hay activos registrados en el sistema.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = camas.map(c => {
+                const id = c[0];
+                const estado = c[1];
+                const grupo = c[2] || '-';
+                const isDisponible = estado === 'Disponible';
+                return `
+                    <tr>
+                        <td><strong>${id}</strong></td>
+                        <td><span class="badge ${estado === 'Disponible' ? 'success' : (estado === 'En Servicio' ? 'warning' : 'danger')}" style="font-size:0.75rem;">${estado}</span></td>
+                        <td>${grupo}</td>
+                        <td>
+                            ${isDisponible ? `
+                            <button class="btn btn-xs btn-danger btn-retire-asset" data-id="${id}" style="width:auto; padding: 0.2rem 0.5rem; font-size: 0.7rem;">
+                                <i class="fa-solid fa-trash"></i> Dar de Baja
+                            </button>
+                            ` : `<span class="text-secondary" style="font-size:0.75rem;">-</span>`}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            tbody.querySelectorAll('.btn-retire-asset').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const id = btn.getAttribute('data-id');
+                    const confirmation = confirm(`¿Estás seguro de que deseas DAR DE BAJA la bandeja ${id}?\n\nEsta bandeja se marcará como 'Baja' y no estará disponible para nuevos lotes.`);
+                    if (!confirmation) return;
+
+                    showLoading("Dando de baja bandeja...");
+                    try {
+                        await GoogleAPI.manageAsset([id], 'Baja');
+                        hideLoading();
+                        alert(`¡Bandeja ${id} dada de baja con éxito!`);
+                        this.renderFeeding(containerId, showLoading, hideLoading);
+                    } catch (err) {
+                        console.error(err);
+                        hideLoading();
+                        alert(`Error al dar de baja bandeja: ${err.message}`);
+                    }
+                });
             });
         };
 
@@ -3168,79 +3319,127 @@ const Components = {
         const updateBatchBar = () => {
             const selectedFilteredCount = Array.from(selectedBeds).filter(id => camas.some(c => c[0] === id)).length;
 
-            if (selectedFilteredCount > 0 && gridSection.classList.contains('hidden') === false) {
-                batchCount.textContent = `${selectedFilteredCount} tina(s) seleccionada(s)`;
-                batchBar.classList.remove('hidden');
+            if (selectedFilteredCount > 0 && gridSection && gridSection.classList.contains('hidden') === false) {
+                if (batchCount) batchCount.textContent = `${selectedFilteredCount} bandeja(s) seleccionada(s)`;
+                if (batchBar) batchBar.classList.remove('hidden');
             } else {
-                batchBar.classList.add('hidden');
+                if (batchBar) batchBar.classList.add('hidden');
             }
         };
 
-        // Filter tabs binding (Stage)
-        stageTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                stageTabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                currentFilterStage = tab.getAttribute('data-stage');
+        // Filter search input
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                currentSearchQuery = searchInput.value.trim();
                 drawGrid();
             });
-        });
-
-        // Filter dropdown binding (Group)
-        groupSelect.addEventListener('change', () => {
-            currentFilterGroup = groupSelect.value;
-            drawGrid();
-        });
-
-        // Search input binding
-        searchInput.addEventListener('input', () => {
-            currentSearchQuery = searchInput.value.trim();
-            drawGrid();
-        });
+        }
 
         // Hide fed toggle binding
-        hideFedCheckbox.addEventListener('change', () => {
-            currentHideFed = hideFedCheckbox.checked;
-            drawGrid();
-        });
-
-        // Select All toggle binding
-        selectAllCheckbox.addEventListener('change', () => {
-            const visibleCamas = camas.filter(c => {
-                const id = c[0];
-                const stage = c[2];
-                const status = c[3];
-                const group = c[4] ? c[4].trim() : 'Sin Grupo';
-                
-                if (status === 'Inactivo') return false;
-                if (status === 'Disponible') return false; // Exclude empty tubs
-                
-                if (currentFilterStage !== 'Todas' && stage !== currentFilterStage) return false;
-                if (currentFilterGroup !== 'Todos' && group !== currentFilterGroup) return false;
-                if (currentHideFed && todayFeedMap[id]) return false;
-                if (currentSearchQuery) {
-                    const searchLower = currentSearchQuery.toLowerCase();
-                    if (!id.toLowerCase().includes(searchLower) && !c[1].toLowerCase().includes(searchLower)) return false;
-                }
-                return true;
+        if (hideFedCheckbox) {
+            hideFedCheckbox.addEventListener('change', () => {
+                currentHideFed = hideFedCheckbox.checked;
+                drawGrid();
             });
-
-            if (selectAllCheckbox.checked) {
-                visibleCamas.forEach(c => selectedBeds.add(c[0]));
-            } else {
-                visibleCamas.forEach(c => selectedBeds.delete(c[0]));
-            }
-
-            drawGrid();
-            updateBatchBar();
-        });
+        }
 
         // Batch Feed trigger
-        batchFeedBtn.addEventListener('click', () => {
-            if (GoogleAPI.user.role === 'Observador') return;
-            const bedsList = Array.from(selectedBeds);
-            this.showCamaFeedingModal(containerId, bedsList, todayFeedMap, showLoading, hideLoading, camas);
-        });
+        if (batchFeedBtn) {
+            batchFeedBtn.addEventListener('click', () => {
+                if (GoogleAPI.user.role === 'Observador') return;
+                const bedsList = Array.from(selectedBeds);
+                this.showCamaFeedingModal(containerId, bedsList, todayFeedMap, showLoading, hideLoading, camas);
+            });
+        }
+
+        // Form Submit: Iniciar Lote (start_batch)
+        const formStartBatch = document.getElementById('form-start-batch');
+        if (formStartBatch) {
+            formStartBatch.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const grupo = document.getElementById('batch-group-name').value.trim();
+                const selectedList = Array.from(selectedDisponibles);
+                if (selectedList.length === 0) {
+                    alert("Por favor, selecciona al menos una bandeja disponible para armar el lote.");
+                    return;
+                }
+                
+                showLoading("Iniciando lote de producción...");
+                try {
+                    await GoogleAPI.startBatch(selectedList, grupo);
+                    hideLoading();
+                    alert(`¡Lote "${grupo}" creado e iniciado con éxito con ${selectedList.length} bandejas!`);
+                    selectedDisponibles.clear();
+                    
+                    this.renderFeeding(containerId, showLoading, hideLoading);
+                } catch (err) {
+                    console.error(err);
+                    hideLoading();
+                    alert(`Error al iniciar lote: ${err.message}`);
+                }
+            });
+        }
+
+        // Form Submit: Alta de Activos (manage_asset)
+        const formManageAssets = document.getElementById('form-manage-assets');
+        if (formManageAssets) {
+            formManageAssets.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const prefix = document.getElementById('asset-prefix').value.trim();
+                const start = parseInt(document.getElementById('asset-start').value);
+                const end = parseInt(document.getElementById('asset-end').value);
+
+                if (end < start) {
+                    alert("El número final no puede ser menor que el inicial.");
+                    return;
+                }
+                if (end - start > 500) {
+                    alert("Por seguridad, el límite máximo por lote es de 500 bandejas.");
+                    return;
+                }
+
+                const assetIds = [];
+                for (let i = start; i <= end; i++) {
+                    const idStr = `${prefix}${String(i).padStart(3, '0')}`;
+                    assetIds.push(idStr);
+                }
+
+                showLoading("Registrando nuevas bandejas...");
+                try {
+                    await GoogleAPI.manageAsset(assetIds, 'Alta');
+                    hideLoading();
+                    alert(`¡${assetIds.length} bandejas dadas de alta con éxito!`);
+                    this.renderFeeding(containerId, showLoading, hideLoading);
+                } catch (err) {
+                    console.error(err);
+                    hideLoading();
+                    alert(`Error al registrar activos: ${err.message}`);
+                }
+            });
+        }
+
+        // Available search binding
+        const searchDisponibleInput = document.getElementById('search-disponible-input');
+        if (searchDisponibleInput) {
+            searchDisponibleInput.addEventListener('input', () => {
+                currentDisponibleSearch = searchDisponibleInput.value.trim();
+                drawDisponibles();
+            });
+        }
+
+        // Available select all binding
+        const selectAllDisponiblesCheckbox = document.getElementById('toggle-select-all-disponibles');
+        if (selectAllDisponiblesCheckbox) {
+            selectAllDisponiblesCheckbox.addEventListener('change', () => {
+                const disponibles = camas.filter(c => c[1] === 'Disponible');
+                if (selectAllDisponiblesCheckbox.checked) {
+                    disponibles.forEach(c => selectedDisponibles.add(c[0]));
+                } else {
+                    disponibles.forEach(c => selectedDisponibles.delete(c[0]));
+                }
+                drawDisponibles();
+            });
+        }
 
         // Expose global variables and callback
         window.Components = window.Components || {};
@@ -3263,16 +3462,13 @@ const Components = {
         drawGrid();
     },
 
-    /**
-     * Show Modal for quick-feeding one or more beds with observations and individual tweaks
-     */
     showCamaFeedingModal(containerId, camasIds, todayFeedMap, showLoading, hideLoading, camas) {
         const modal = document.getElementById('cama-feed-modal');
 
         // Create quick lookup map for names and groups
         const camaDetailsMap = {};
         camas.forEach(c => {
-            camaDetailsMap[c[0]] = { name: c[1].replace('Cama', 'Tina'), group: c[4] || 'Sin Grupo' };
+            camaDetailsMap[c[0]] = { name: "Bandeja " + c[0], group: c[2] || 'Sin Lote' };
         });
 
         const defaultQty = 1.0;
@@ -3281,7 +3477,7 @@ const Components = {
             <div class="modal-card" style="max-width: 600px;">
                 <div class="modal-header" style="background-color: var(--brand-primary); color: #090d16;">
                     <i class="fa-solid fa-seedling"></i>
-                    <h3>Registrar Alimentación (Tinas)</h3>
+                    <h3>Registrar Alimentación (Bandejas)</h3>
                 </div>
                 <div class="modal-body" style="padding: 1.25rem;">
                     <form id="modal-feeding-form">
@@ -3298,8 +3494,8 @@ const Components = {
                                 </datalist>
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="feed-qty">Dosis General (kg/tina)</label>
-                                <input type="number" id="feed-qty" class="form-control" placeholder="1.0" step="0.1" value="${defaultQty}" required>
+                                <label class="form-label" for="feed-qty">Dosis General (kg/bandeja)</label>
+                                <input type="number" inputmode="decimal" id="feed-qty" class="form-control" placeholder="1.0" step="0.1" value="${defaultQty}" required>
                             </div>
                         </div>
 
@@ -3311,14 +3507,14 @@ const Components = {
                         <!-- INDIVIDUAL BED BREAKDOWN -->
                         <div class="section-divider" style="margin: 1rem 0;"></div>
                         <label class="form-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                            <span>Desglose y Notas por Tina (${camasIds.length})</span>
-                            <small class="text-secondary">Opcional: puedes cambiar dosis o añadir notas por tina</small>
+                            <span>Desglose y Notas por Bandeja (${camasIds.length})</span>
+                            <small class="text-secondary">Opcional: puedes cambiar dosis o añadir notas por bandeja</small>
                         </label>
 
                         <!-- Beds List scroll wrapper -->
                         <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); margin-bottom: 1.25rem; background-color: var(--bg-primary); padding: 0.25rem;">
                             ${camasIds.map(id => {
-                                const details = camaDetailsMap[id] || { name: id, group: 'Sin Grupo' };
+                                const details = camaDetailsMap[id] || { name: "Bandeja " + id, group: 'Sin Lote' };
                                 return `
                                     <div class="d-flex align-items-center justify-content-between p-2 border-bottom modal-cama-row" data-id="${id}" style="gap: 0.5rem; border-bottom-color: var(--border-color); flex-wrap: wrap;">
                                         <div style="display: flex; flex-direction: column; min-width: 90px;">
@@ -3326,9 +3522,9 @@ const Components = {
                                             <span style="font-size: 0.7rem; color: var(--text-secondary);">${details.group}</span>
                                         </div>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; flex-grow: 1;">
-                                            <input type="number" class="form-control form-control-sm individual-qty" data-id="${id}" value="${defaultQty}" step="0.1" style="width: 70px; margin-bottom: 0; padding: 0.35rem 0.5rem; font-size: 0.8rem;" required>
+                                            <input type="number" inputmode="decimal" class="form-control form-control-sm individual-qty" data-id="${id}" value="${defaultQty}" step="0.1" style="width: 70px; margin-bottom: 0; padding: 0.35rem 0.5rem; font-size: 0.8rem;" required>
                                             <span style="font-size: 0.75rem; color: var(--text-secondary); margin-right: 0.25rem;">kg</span>
-                                            <input type="text" class="form-control form-control-sm individual-obs" data-id="${id}" placeholder="Nota tina (ej. larva lenta, humedad alta)" style="flex-grow: 1; margin-bottom: 0; padding: 0.35rem 0.5rem; font-size: 0.8rem;">
+                                            <input type="text" class="form-control form-control-sm individual-obs" data-id="${id}" placeholder="Nota..." style="flex-grow: 1; margin-bottom: 0; padding: 0.35rem 0.5rem; font-size: 0.8rem;">
                                         </div>
                                     </div>
                                 `;
@@ -3347,7 +3543,6 @@ const Components = {
 
         modal.classList.remove('hidden');
 
-        // Dynamic synchronization between general qty input and individual inputs
         const generalQtyInput = document.getElementById('feed-qty');
         generalQtyInput.addEventListener('input', () => {
             const val = generalQtyInput.value;
@@ -3366,7 +3561,6 @@ const Components = {
             showLoading("Guardando registros en Google Sheets...");
 
             try {
-                // 1. Fetch current feeding logs to calculate starting order
                 const allLogs = await GoogleAPI.getFeedingLogs();
                 const now = new Date();
                 const offset = now.getTimezoneOffset();
@@ -3380,7 +3574,6 @@ const Components = {
                 const generalObs = document.getElementById('feed-observacion-general').value.trim();
                 const dateTimeStr = localNow.toISOString().replace('T', ' ').substring(0, 19);
 
-                // 2. Map through each row in modal to collect individual qty and notes
                 let totalQtyUsed = 0;
                 const rowsHTML = modal.querySelectorAll('.modal-cama-row');
                 const feedingRows = Array.from(rowsHTML).map(row => {
@@ -3389,15 +3582,17 @@ const Components = {
                     const specificObs = row.querySelector('.individual-obs').value.trim();
                     totalQtyUsed += qty;
 
-                    // Concatenate general notes and specific bed observations
                     let finalObs = '';
                     if (generalObs && specificObs) {
                         finalObs = `[Gral: ${generalObs}] - ${specificObs}`;
                     } else if (generalObs) {
                         finalObs = generalObs;
                     } else if (specificObs) {
-                        finalObs = `[Tina: ${specificObs}]`;
+                        finalObs = `[Bandeja: ${specificObs}]`;
                     }
+
+                    const trayObj = camas.find(c => c[0] === bedId);
+                    const tinaCiclo = (trayObj && trayObj[3]) ? trayObj[3].toString().trim() : 'Ciclo Legacy';
 
                     const record = [
                         `FEED_${Date.now()}_${Math.floor(Math.random()*1000)}`,
@@ -3407,7 +3602,8 @@ const Components = {
                         insumo,
                         qty,
                         GoogleAPI.user.name,
-                        finalObs
+                        finalObs,
+                        tinaCiclo // Column 9 (Index 8)
                     ];
                     nextOrder++;
                     return record;
@@ -3416,7 +3612,7 @@ const Components = {
                 // Write batch to Sheets
                 await GoogleAPI.appendFeedingLogsBatch(feedingRows);
 
-                // 3. Register total stock decrease in Insumos
+                // Register total stock decrease in Insumos
                 const supplyValues = [[
                     `SUP_${Date.now()}_FEED_GRP`,
                     'MANUAL',
@@ -3425,14 +3621,15 @@ const Components = {
                     'Utilización',
                     totalQtyUsed,
                     'kg',
-                    0
+                    0,
+                    'Sustrato',
+                    ''
                 ]];
-                await GoogleAPI.appendSheetData('Insumos!A:H', supplyValues);
+                await GoogleAPI.appendSheetData('Insumos!A:J', supplyValues);
 
                 hideLoading();
-                alert(`¡Alimentación registrada para ${camasIds.length} tina(s). Total alimento utilizado: ${totalQtyUsed.toFixed(1)} kg.`);
+                alert(`¡Alimentación registrada para ${camasIds.length} bandeja(s). Total alimento utilizado: ${totalQtyUsed.toFixed(1)} kg.`);
                 
-                // Clear batch selection bar
                 const selectAllCheckbox = document.getElementById('toggle-select-all');
                 if (selectAllCheckbox) selectAllCheckbox.checked = false;
                 
@@ -3446,186 +3643,7 @@ const Components = {
         });
     },
 
-    /**
-     * Show Modal for creating a range of camas
-     */
-    showCamaCreatorModal(containerId, showLoading, hideLoading) {
-        const modal = document.getElementById('cama-create-modal');
 
-        modal.innerHTML = `
-            <div class="modal-card">
-                <div class="modal-header" style="background-color: var(--brand-primary); color: #090d16;">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i>
-                    <h3>Configuración de Tinas (Rango)</h3>
-                </div>
-                <div class="modal-body">
-                    <p class="mb-3">Genera múltiples tinas automáticamente. Ideal para dar de alta estanterías enteras.</p>
-                    <form id="modal-cama-form">
-                        <div class="form-group">
-                            <label class="form-label" for="c-prefix">Prefijo de ID</label>
-                            <input type="text" id="c-prefix" class="form-control" value="TIN" placeholder="Ej: TIN" required>
-                        </div>
-                        <div class="form-row-2">
-                            <div class="form-group">
-                                <label class="form-label" for="c-start">Tina Inicial (Número)</label>
-                                <input type="number" id="c-start" class="form-control" value="1" min="1" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label" for="c-end">Tina Final (Número)</label>
-                                <input type="number" id="c-end" class="form-control" value="100" min="1" required>
-                            </div>
-                        </div>
-                        <div class="form-row-2">
-                            <div class="form-group">
-                                <label class="form-label" for="c-stage">Etapa Larva Inicial</label>
-                                <select id="c-stage" class="form-control" required>
-                                    <option value="Neonatos">Neonatos (1-5 días)</option>
-                                    <option value="Pequeña">Pequeña (Larva joven)</option>
-                                    <option value="Mediana">Mediana (Crecimiento)</option>
-                                    <option value="Grande">Grande (Engorde final)</option>
-                                    <option value="Prepupa">Prepupa</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label" for="c-group">Grupo / Estante</label>
-                                <input type="text" id="c-group" class="form-control" value="Grupo A" placeholder="Ej: Estante A, Lote 1" required>
-                            </div>
-                        </div>
-                        <div class="modal-footer" style="padding-right: 0; padding-bottom: 0; border: none; background: transparent;">
-                            <button type="button" id="btn-c-cancel" class="btn btn-secondary">Cancelar</button>
-                            <button type="submit" class="btn btn-primary">Generar Tinas</button>
-                        </div>
-                    </form>
-                    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border-color);">
-                        <h4 class="text-danger mb-2" style="color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> Zona de Peligro (Reinicio)</h4>
-                        <p style="font-size: 0.85rem; color: var(--text-secondary);" class="mb-3">
-                            Esto borrará permanentemente todas las tinas, alimentaciones, etapas, reportes, contabilidad e inventario para iniciar el sistema desde cero.
-                        </p>
-                        <button type="button" id="btn-reset-database" class="btn btn-sm mb-3" style="background-color: #ef4444; border-color: #ef4444; color: white; width: 100%; margin-bottom: 0.75rem;">
-                            <i class="fa-solid fa-trash-can"></i> Reiniciar Todo el Sistema
-                        </button>
-                        
-                        <p style="font-size: 0.85rem; color: var(--text-secondary);" class="mt-2 mb-2">
-                            O desactiva todas las tinas para reconfigurar el criadero desde cero (mantiene los reportes históricos pero inhabilita todas las tinas).
-                        </p>
-                        <button type="button" id="btn-disable-all-tinas" class="btn btn-sm" style="background-color: var(--text-warning); border-color: var(--text-warning); color: #090d16; width: 100%; font-weight: bold;">
-                            <i class="fa-solid fa-power-off"></i> Inhabilitar Todas las Tinas
-                        </button>
-                    </div>
-
-                    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border-color);">
-                        <h4 class="mb-2" style="color: var(--brand-primary);"><i class="fa-solid fa-key"></i> Credenciales de Google API</h4>
-                        <p style="font-size: 0.85rem; color: var(--text-secondary);" class="mb-3">
-                            Copia estos códigos para rellenar el archivo <code>config.js</code>:
-                        </p>
-                        <div style="font-size: 0.8rem; background: var(--bg-primary); padding: 0.75rem; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 0.5rem; word-break: break-all; user-select: all; text-align: left;">
-                            <div><strong>Google API Key:</strong> <br><span style="font-family: monospace; color: var(--text-warning);">${GoogleAPI.config?.apiKey || ''}</span></div>
-                            <div class="mt-2"><strong>Google Client ID:</strong> <br><span style="font-family: monospace; color: var(--text-warning);">${GoogleAPI.config?.clientId || ''}</span></div>
-                            <div class="mt-2"><strong>Spreadsheet ID:</strong> <br><span style="font-family: monospace; color: var(--text-warning);">${GoogleAPI.config?.spreadsheetId || ''}</span></div>
-                            <div class="mt-2"><strong>Drive Folder ID:</strong> <br><span style="font-family: monospace; color: var(--text-warning);">${GoogleAPI.config?.driveFolderId || ''}</span></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        modal.classList.remove('hidden');
-
-        const cancelBtn = document.getElementById('btn-c-cancel');
-        cancelBtn.addEventListener('click', () => modal.classList.add('hidden'));
-
-        const resetBtn = document.getElementById('btn-reset-database');
-        if (resetBtn) {
-            resetBtn.addEventListener('click', async () => {
-                const confirmation = confirm("¿Estás absolutamente seguro de que deseas REINICIAR todo el sistema?\n\nEsta acción eliminará de forma permanente todas las tinas, bitácoras, transacciones contables e inventario de insumos. No se puede deshacer.");
-                if (!confirmation) return;
-                
-                const typeConfirm = prompt("Por seguridad, escribe 'REINICIAR TODO' en mayúsculas para proceder:");
-                if (typeConfirm !== 'REINICIAR TODO') {
-                    alert("Confirmación incorrecta. Operación cancelada.");
-                    return;
-                }
-                
-                modal.classList.add('hidden');
-                showLoading("Reiniciando base de datos completa...");
-                
-                try {
-                    await GoogleAPI.resetDatabase();
-                    hideLoading();
-                    alert("¡El sistema ha sido reiniciado por completo! La base de datos está en blanco.");
-                    
-                    // Redirect to home and refresh to trigger setup / blank state
-                    window.location.hash = '#feeding';
-                    window.location.reload();
-                } catch (err) {
-                    console.error("Database reset error", err);
-                    hideLoading();
-                    const errMsg = err.result?.error?.message || err.message || (typeof err === 'object' ? JSON.stringify(err) : err) || "Error desconocido";
-                    alert(`Error al reiniciar la base de datos: ${errMsg}`);
-                }
-            });
-        }
-
-        const disableAllBtn = document.getElementById('btn-disable-all-tinas');
-        if (disableAllBtn) {
-            disableAllBtn.addEventListener('click', async () => {
-                const confirmation = confirm("¿Estás seguro de que deseas INHABILITAR todas las tinas?\n\nEsto cambiará el estado de todas las tinas a 'Inactivo' y tendrás que habilitar manualmente cada una para iniciar nuevos ciclos.");
-                if (!confirmation) return;
-                
-                modal.classList.add('hidden');
-                showLoading("Inhabilitando todas las tinas...");
-                
-                try {
-                    await GoogleAPI.disableAllTinas();
-                    hideLoading();
-                    alert("¡Todas las tinas han sido inhabilitadas con éxito!");
-                    
-                    window.location.hash = '#feeding';
-                    window.location.reload();
-                } catch (err) {
-                    console.error("Disable all tinas error", err);
-                    hideLoading();
-                    const errMsg = err.result?.error?.message || err.message || (typeof err === 'object' ? JSON.stringify(err) : err) || "Error desconocido";
-                    alert(`Error al inhabilitar tinas: ${errMsg}`);
-                }
-            });
-        }
-
-        const form = document.getElementById('modal-cama-form');
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            modal.classList.add('hidden');
-            showLoading("Generando tinas en base de datos de Sheets...");
-
-            try {
-                const prefix = document.getElementById('c-prefix').value.trim();
-                const start = parseInt(document.getElementById('c-start').value);
-                const end = parseInt(document.getElementById('c-end').value);
-                const stage = document.getElementById('c-stage').value;
-                const group = document.getElementById('c-group').value.trim();
-
-                if (end < start) {
-                    throw new Error("La tina final no puede ser menor que la inicial.");
-                }
-
-                if ((end - start) > 1000) {
-                    throw new Error("Por seguridad, el límite máximo por lote es de 1000 tinas.");
-                }
-
-                // Call GoogleAPI batch creator with group parameter
-                await GoogleAPI.createCamasRange(start, end, prefix, stage, group);
-
-                hideLoading();
-                alert(`¡Tinas del ${start} al ${end} generadas en el ${group} con éxito!`);
-                this.renderFeeding(containerId, showLoading, hideLoading); // Refresh
-
-            } catch (err) {
-                console.error("Camas range creation error", err);
-                hideLoading();
-                alert(`Error al generar tinas: ${err.message}`);
-            }
-        });
-    },
 
     /**
      * Show detailed Tina Ficha Técnica
@@ -3634,11 +3652,11 @@ const Components = {
         showLoading("Cargando Ficha Técnica...");
         
         try {
-            const details = camas.find(c => c[0] === tinaId) || [tinaId, `Tina ${tinaId}`, 'Neonatos', 'Activo', 'Sin Grupo'];
-            const name = details[1].replace('Cama', 'Tina');
-            const currentStage = details[2];
-            const estado = details[3];
-            const grupo = details[4] || 'Sin Grupo';
+            const details = camas.find(c => c[0] === tinaId) || [tinaId, 'Disponible', '', ''];
+            const name = "Bandeja " + tinaId;
+            const estado = details[1] || 'Disponible';
+            const grupo = details[2] || 'Sin Lote';
+            const cicloId = details[3] || 'Sin Ciclo';
             
             // Fetch feedings and stages
             const allFeedings = await GoogleAPI.getFeedingLogs();
@@ -3649,6 +3667,7 @@ const Components = {
             
             // Sort stages ascending to calculate durations
             const sortedStages = [...tinaStages].sort((a, b) => new Date(a[2].replace(' ', 'T')) - new Date(b[2].replace(' ', 'T')));
+            const currentStage = sortedStages.length > 0 ? sortedStages[sortedStages.length - 1][4] : 'Neonatos';
             
             // Find the start of the current cycle (most recent re-initialization)
             let currentCycleStartIdx = 0;
@@ -3794,86 +3813,39 @@ const Components = {
                             </div>
                         </div>
 
-                        <!-- Update lifecycle stage, Start cycle, or Enable (Form) -->
-                        ${GoogleAPI.user.role !== 'Observador' ? (
-                            estado === 'Inactivo' ? `
-                                <div class="card p-3 mb-4" style="border: 1px solid var(--text-warning); background-color: var(--bg-primary);">
-                                    <h4 class="mb-3 text-warning"><i class="fa-solid fa-square-check"></i> Habilitar Tina para Uso</h4>
-                                    <p style="font-size: 0.85rem; color: var(--text-secondary);" class="mb-3">
-                                        Esta tina se encuentra inhabilitada (fuera de servicio). Para poder iniciar un nuevo ciclo de cría en ella, debes habilitarla manualmente.
-                                    </p>
-                                    <button type="button" id="btn-modal-enable-tina" class="btn btn-warning btn-sm" style="width: auto; font-weight: bold;">
-                                        <i class="fa-solid fa-square-check"></i> Habilitar Tina ahora
+                        <!-- Update lifecycle stage (Only for En Servicio) -->
+                        ${GoogleAPI.user.role !== 'Observador' && estado === 'En Servicio' ? `
+                            <div class="card p-3 mb-4" style="border: 1px solid var(--border-color); background-color: var(--bg-primary);">
+                                <h4 class="mb-3"><i class="fa-solid fa-arrows-spin text-success"></i> Actualizar Etapa de Ciclo de Vida</h4>
+                                <form id="form-update-stage">
+                                    <div class="form-row-2">
+                                        <div class="form-group mb-0">
+                                            <label class="form-label" for="detail-new-stage">Nueva Etapa</label>
+                                            <select id="detail-new-stage" class="form-control" style="padding: 0.5rem;" required>
+                                                <optgroup label="Etapas Biológicas">
+                                                    <option value="Neonatos" ${currentStage === 'Neonatos' ? 'selected' : ''}>Neonatos (1-5 días)</option>
+                                                    <option value="Pequeña" ${currentStage === 'Pequeña' ? 'selected' : ''}>Pequeña (larva joven)</option>
+                                                    <option value="Mediana" ${currentStage === 'Mediana' ? 'selected' : ''}>Mediana (crecimiento)</option>
+                                                    <option value="Grande" ${currentStage === 'Grande' ? 'selected' : ''}>Grande (engorde)</option>
+                                                    <option value="Prepupa" ${currentStage === 'Prepupa' ? 'selected' : ''}>Prepupa</option>
+                                                </optgroup>
+                                                <optgroup label="Cosechas Parciales (Mantienen Ciclo)">
+                                                    <option value="Cosecha Parcial de Larvas">Cosecha Parcial de Larvas</option>
+                                                    <option value="Cosecha Parcial de Pupas">Cosecha Parcial de Pupas</option>
+                                                </optgroup>
+                                            </select>
+                                        </div>
+                                        <div class="form-group mb-0">
+                                            <label class="form-label" for="detail-stage-obs">Observación / Nota</label>
+                                            <input type="text" id="detail-stage-obs" class="form-control" placeholder="Ej: desarrollo vigoroso, sustrato húmedo">
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary btn-sm mt-3" style="width: auto;">
+                                        <i class="fa-solid fa-floppy-disk"></i> Guardar Nueva Etapa
                                     </button>
-                                </div>
-                            ` : (
-                                estado === 'Disponible' ? `
-                                    <div class="card p-3 mb-4" style="border: 1px solid var(--brand-primary); background-color: var(--bg-primary);">
-                                        <h4 class="mb-3"><i class="fa-solid fa-play text-success"></i> Iniciar Nuevo Ciclo de Cría</h4>
-                                        <form id="form-start-cycle">
-                                            <div class="form-row-2">
-                                                <div class="form-group mb-0">
-                                                    <label class="form-label" for="start-initial-stage">Etapa Inicial</label>
-                                                    <select id="start-initial-stage" class="form-control" style="padding: 0.5rem;" required>
-                                                        <option value="Neonatos">Neonatos (1-5 días)</option>
-                                                        <option value="Pequeña">Pequeña (larva joven)</option>
-                                                        <option value="Mediana">Mediana (crecimiento)</option>
-                                                        <option value="Grande">Grande (engorde)</option>
-                                                        <option value="Prepupa">Prepupa</option>
-                                                    </select>
-                                                </div>
-                                                <div class="form-group mb-0">
-                                                    <label class="form-label" for="start-group">Grupo / Estante</label>
-                                                    <input type="text" id="start-group" class="form-control" value="${grupo}" placeholder="Ej: Estante A">
-                                                </div>
-                                            </div>
-                                            <div class="form-group mt-3">
-                                                <label class="form-label" for="start-obs">Observación Inicial</label>
-                                                <input type="text" id="start-obs" class="form-control" placeholder="Ej: Iniciando lote con 20g de huevos">
-                                            </div>
-                                            <button type="submit" class="btn btn-primary btn-sm mt-3" style="width: auto;">
-                                                <i class="fa-solid fa-play"></i> Iniciar Ciclo Activo
-                                            </button>
-                                        </form>
-                                    </div>
-                                ` : `
-                                    <div class="card p-3 mb-4" style="border: 1px solid var(--border-color); background-color: var(--bg-primary);">
-                                        <h4 class="mb-3"><i class="fa-solid fa-arrows-spin text-success"></i> Actualizar Etapa de Ciclo de Vida</h4>
-                                        <form id="form-update-stage">
-                                            <div class="form-row-2">
-                                                <div class="form-group mb-0">
-                                                    <label class="form-label" for="detail-new-stage">Nueva Etapa</label>
-                                                    <select id="detail-new-stage" class="form-control" style="padding: 0.5rem;" required>
-                                                        <optgroup label="Etapas Biológicas">
-                                                            <option value="Neonatos" ${currentStage === 'Neonatos' ? 'selected' : ''}>Neonatos (1-5 días)</option>
-                                                            <option value="Pequeña" ${currentStage === 'Pequeña' ? 'selected' : ''}>Pequeña (larva joven)</option>
-                                                            <option value="Mediana" ${currentStage === 'Mediana' ? 'selected' : ''}>Mediana (crecimiento)</option>
-                                                            <option value="Grande" ${currentStage === 'Grande' ? 'selected' : ''}>Grande (engorde)</option>
-                                                            <option value="Prepupa" ${currentStage === 'Prepupa' ? 'selected' : ''}>Prepupa</option>
-                                                        </optgroup>
-                                                        <optgroup label="Cosechas Parciales (Mantienen Ciclo)">
-                                                            <option value="Cosecha Parcial de Larvas">Cosecha Parcial de Larvas</option>
-                                                            <option value="Cosecha Parcial de Pupas">Cosecha Parcial de Pupas</option>
-                                                        </optgroup>
-                                                        <optgroup label="Cosechas Totales (Terminan Ciclo)">
-                                                            <option value="Cosecha Total de Larvas">Cosecha Total de Larvas (Finaliza ciclo)</option>
-                                                            <option value="Cosecha Total de Pupas">Cosecha Total de Pupas (Finaliza ciclo)</option>
-                                                        </optgroup>
-                                                    </select>
-                                                </div>
-                                                <div class="form-group mb-0">
-                                                    <label class="form-label" for="detail-stage-obs">Observación / Nota</label>
-                                                    <input type="text" id="detail-stage-obs" class="form-control" placeholder="Ej: desarrollo vigoroso, sustrato húmedo">
-                                                </div>
-                                            </div>
-                                            <button type="submit" class="btn btn-primary btn-sm mt-3" style="width: auto;">
-                                                <i class="fa-solid fa-floppy-disk"></i> Guardar Nueva Etapa
-                                            </button>
-                                        </form>
-                                    </div>
-                                `
-                            )
-                        ) : ''}
+                                </form>
+                            </div>
+                        ` : ''}
 
                         <!-- Timeline (Historial) -->
                         <div>
@@ -3928,32 +3900,7 @@ const Components = {
                 if (e.target === modal) modal.classList.add('hidden');
             });
             
-            // Submit start cycle form
-            const startForm = document.getElementById('form-start-cycle');
-            if (startForm) {
-                startForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    const initialStage = document.getElementById('start-initial-stage').value;
-                    const newGroup = document.getElementById('start-group').value.trim() || 'Sin Grupo';
-                    const obs = document.getElementById('start-obs').value.trim();
-                    
-                    modal.classList.add('hidden');
-                    showLoading("Iniciando nuevo ciclo de cría...");
-                    
-                    try {
-                        await GoogleAPI.startNewCycle(tinaId, initialStage, newGroup, obs);
-                        hideLoading();
-                        alert(`¡Nuevo ciclo de cría iniciado en la tina ${tinaId} con etapa ${initialStage}!`);
-                        
-                        // Re-render
-                        this.renderFeeding(containerId, showLoading, hideLoading);
-                    } catch (err) {
-                        console.error(err);
-                        hideLoading();
-                        alert(`Error al iniciar ciclo de cría: ${err.message}`);
-                    }
-                });
-            }
+            // Individual cycles are started via startBatch (Armar Lote) in groups.
             
             // Submit stage change form
             const form = document.getElementById('form-update-stage');
@@ -3986,27 +3933,7 @@ const Components = {
                 });
             }
 
-            // Submit enable tina button in modal
-            const modalEnableBtn = document.getElementById('btn-modal-enable-tina');
-            if (modalEnableBtn) {
-                modalEnableBtn.addEventListener('click', async () => {
-                    modal.classList.add('hidden');
-                    showLoading("Habilitando tina...");
-                    
-                    try {
-                        await GoogleAPI.enableTina(tinaId);
-                        hideLoading();
-                        alert(`¡Tina ${tinaId} habilitada con éxito! Ahora puedes iniciar su ciclo.`);
-                        
-                        // Re-render
-                        this.renderFeeding(containerId, showLoading, hideLoading);
-                    } catch (err) {
-                        console.error(err);
-                        hideLoading();
-                        alert(`Error al habilitar tina: ${err.message}`);
-                    }
-                });
-            }
+            // Habilitación and range creations are deleted as assets are managed via manageAsset and startBatch.
             
         } catch (err) {
             console.error("Detail modal load error", err);
@@ -4244,7 +4171,9 @@ async function submitReportData(payload) {
         }
         
         const qtyPerTina = payload.alimentacion.totalQty / payload.alimentacion.selectedTinas.length;
-        const feedingRows = payload.alimentacion.selectedTinas.map(tinaId => {
+        const feedingRows = payload.alimentacion.selectedTinas.map(tinaObj => {
+            const tinaId = typeof tinaObj === 'object' ? tinaObj.id : tinaObj;
+            const tinaCiclo = typeof tinaObj === 'object' ? tinaObj.cicloId : 'Ciclo Legacy';
             const row = [
                 `FEED_${Date.now()}_${Math.floor(Math.random()*1000)}`,
                 tinaId,
@@ -4253,7 +4182,8 @@ async function submitReportData(payload) {
                 payload.alimentacion.insumo,
                 qtyPerTina,
                 payload.username,
-                `Alimentación registrada vía Reporte Diario ${payload.reportId} (${payload.alimentacion.feedUnit})`
+                `Alimentación registrada vía Reporte Diario ${payload.reportId} (${payload.alimentacion.feedUnit})`,
+                tinaCiclo // 9th column
             ];
             nextOrder++;
             return row;
@@ -4276,7 +4206,7 @@ async function submitReportData(payload) {
         await GoogleAPI.appendSheetData('Insumos!A:J', supplyValues);
     }
     
-    await GoogleAPI.appendSheetData('Reportes!A:F', payload.reportValues);
+    await GoogleAPI.appendSheetData('Reportes!A:G', payload.reportValues);
 }
 
 async function submitSupplyData(payload) {

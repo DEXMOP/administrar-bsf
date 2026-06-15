@@ -89,8 +89,7 @@ const App = {
     initTheme() {
         let preferredTheme = localStorage.getItem('bsf_theme');
         if (!preferredTheme) {
-            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-            preferredTheme = prefersDark ? 'dark-theme' : 'light-theme';
+            preferredTheme = 'light-theme';
         }
         this.elements.body.className = preferredTheme;
         this.updateThemeIcon(preferredTheme);

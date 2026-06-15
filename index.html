@@ -178,6 +178,136 @@
         </div>
     </div>
 
+    <!-- Template para el Gestor Dinámico de Activos y Lotes (Control de Tinas) -->
+    <template id="template-feeding-view">
+        <div class="slide-in-view">
+            <!-- Main sub-tabs for Control de Bandejas -->
+            <div class="filter-tabs mb-3" id="feeding-main-tabs" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <span class="filter-tab active" data-tab="tinas-grid" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-border-all"></i> Bandejas Activas</span>
+                <span class="filter-tab" data-tab="armar-lote" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-square-plus"></i> Armar Lote</span>
+                <!-- Se mostrará dinámicamente si el usuario es Socio o Administrador -->
+                <span class="filter-tab" data-tab="inventario-activos" id="tab-inventario-activos" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-boxes-stacked"></i> Inventario de Activos</span>
+                <span class="filter-tab" data-tab="feeding-history" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-clock-rotate-left"></i> Historial de Alimentación</span>
+            </div>
+            
+            <!-- Content sections wrapper -->
+            <div id="feeding-tabs-content">
+                <!-- VISTA 3: BANDEJAS ACTIVAS -->
+                <div id="tinas-grid-section">
+                    <div class="camas-filter-bar mb-3" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+                        <div class="form-group mb-0" style="margin-bottom: 0; min-width: 200px; flex-grow: 1; max-width: 400px;">
+                            <input type="text" id="search-cama-input" class="form-control" placeholder="Buscar por ID o Lote... (ej. B-001)">
+                        </div>
+                        <div style="display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;">
+                            <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem; margin-bottom: 0;">
+                                <input type="checkbox" id="toggle-hide-fed" style="width: 17px; height: 17px; accent-color: var(--brand-primary);">
+                                Ocultar alimentadas hoy
+                            </label>
+                        </div>
+                    </div>
+                    <div id="camas-grid-container"></div>
+                </div>
+
+                <!-- VISTA 2: ARMAR LOTE -->
+                <div id="armar-lote-section" class="hidden">
+                    <div class="card p-3 mb-3">
+                        <h4 class="mb-3 text-success"><i class="fa-solid fa-square-plus"></i> Crear Nuevo Lote de Producción</h4>
+                        <form id="form-start-batch" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+                            <div class="form-group mb-0" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+                                <label class="form-label" for="batch-group-name">Nombre del Lote / Grupo</label>
+                                <input type="text" id="batch-group-name" class="form-control" placeholder="Ej: Lote A, Estante 3" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="height: 42px;">
+                                <i class="fa-solid fa-play"></i> Iniciar Lote con Seleccionadas
+                            </button>
+                        </form>
+                    </div>
+                    <div class="card p-3 mb-3" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                        <div class="form-group mb-0" style="flex: 1; max-width: 300px; margin-bottom: 0;">
+                            <input type="text" id="search-disponible-input" class="form-control" placeholder="Buscar disponible por ID...">
+                        </div>
+                        <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem; margin-bottom: 0;">
+                            <input type="checkbox" id="toggle-select-all-disponibles" style="width: 17px; height: 17px; accent-color: var(--brand-primary);">
+                            Seleccionar todas las disponibles
+                        </label>
+                    </div>
+                    <div class="camas-grid" id="disponibles-grid-container"></div>
+                </div>
+
+                <!-- VISTA 1: INVENTARIO DE ACTIVOS (ADMIN) -->
+                <div id="inventario-activos-section" class="hidden">
+                    <div class="card p-3 mb-3">
+                        <h4 class="mb-3 text-success"><i class="fa-solid fa-boxes-stacked"></i> Alta Secuencial de Bandejas</h4>
+                        <form id="form-manage-assets" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) auto; gap: 1rem; align-items: flex-end;">
+                            <div class="form-group mb-0" style="margin-bottom: 0;">
+                                <label class="form-label" for="asset-prefix">Prefijo</label>
+                                <input type="text" id="asset-prefix" class="form-control" value="B-" placeholder="Ej: B-" required>
+                            </div>
+                            <div class="form-group mb-0" style="margin-bottom: 0;">
+                                <label class="form-label" for="asset-start">Inicio Secuencia</label>
+                                <input type="number" id="asset-start" class="form-control" value="1" min="1" required>
+                            </div>
+                            <div class="form-group mb-0" style="margin-bottom: 0;">
+                                <label class="form-label" for="asset-end">Fin Secuencia</label>
+                                <input type="number" id="asset-end" class="form-control" value="48" min="1" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="height: 42px;">
+                                <i class="fa-solid fa-plus"></i> Dar de Alta
+                            </button>
+                        </form>
+                    </div>
+                    <div class="card">
+                        <h4 class="mb-3"><i class="fa-solid fa-list"></i> Listado Total de Bandejas</h4>
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>ID Bandeja</th>
+                                        <th>Estado</th>
+                                        <th>Lote Actual / Grupo</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="assets-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN HISTORIAL -->
+                <div id="feeding-history-section" class="hidden">
+                    <div class="card p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div class="filter-tabs" id="history-view-tabs" style="border: none; margin-bottom: 0; display: flex; gap: 0.5rem;">
+                                <span class="filter-tab active" data-view="all-feedings" style="cursor: pointer; padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.85rem;"><i class="fa-solid fa-list-ol"></i> Ver por Alimentaciones</span>
+                                <span class="filter-tab" data-view="by-tina" style="cursor: pointer; padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.85rem;"><i class="fa-solid fa-filter"></i> Ver por Número de Bandeja</span>
+                            </div>
+                            <div id="history-tina-selector-wrapper" class="hidden" style="display: flex; align-items: center; gap: 0.5rem;">
+                                <label for="history-tina-select" class="form-label mb-0" style="font-size: 0.85rem; margin-bottom: 0; white-space: nowrap;">Seleccionar Bandeja:</label>
+                                <select id="history-tina-select" class="form-control" style="padding: 0.35rem 0.5rem; font-size: 0.85rem; width: 180px;">
+                                    <option value="">-- Seleccionar --</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="feeding-history-list-container"></div>
+                </div>
+            </div>
+
+            <!-- Floating Batch Action Bar -->
+            <div id="batch-action-bar" class="batch-action-bar hidden">
+                <span class="batch-action-text" id="batch-selected-count">0 bandejas seleccionadas</span>
+                <button id="btn-batch-feed" class="btn btn-primary btn-sm">
+                    <i class="fa-solid fa-seedling"></i> Alimentar Selección
+                </button>
+            </div>
+
+            <!-- Modals -->
+            <div id="cama-feed-modal" class="modal-overlay hidden"></div>
+            <div id="tina-detail-modal" class="modal-overlay hidden"></div>
+        </div>
+    </template>
+
     <!-- Chart.js for data visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     

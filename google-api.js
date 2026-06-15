@@ -278,7 +278,7 @@ const GoogleAPI = {
             });
             
             const existingSheets = spreadsheet.result.sheets.map(s => s.properties.title);
-            const requiredSheets = ['Usuarios', 'Reportes', 'Finanzas', 'Insumos', 'Camas', 'Registro_Alimentacion', 'Registro_Etapas', 'Registro_Eliminados', 'Maquinaria'];
+            const requiredSheets = ['Usuarios', 'Reportes', 'Finanzas', 'Insumos', 'Camas', 'Registro_Alimentacion', 'Registro_Etapas', 'Registro_Eliminados', 'Maquinaria', 'Historico_Ciclos'];
             const sheetsToCreate = requiredSheets.filter(name => !existingSheets.includes(name));
 
             // 2. Create missing sheets and initialize headers
@@ -297,14 +297,15 @@ const GoogleAPI = {
                 for (const sheetName of sheetsToCreate) {
                     let headers = [];
                     if (sheetName === 'Usuarios') headers = [['Email', 'Nombre', 'Rol']];
-                    else if (sheetName === 'Reportes') headers = [['ID_Reporte', 'Fecha_Hora', 'Descripcion', 'Fotos_IDs', 'Categoria', 'Usuario']];
+                    else if (sheetName === 'Reportes') headers = [['ID_Reporte', 'Fecha_Hora', 'Descripcion', 'Fotos_IDs', 'Categoria', 'Usuario', 'Ciclo_ID']];
                     else if (sheetName === 'Finanzas') headers = [['ID_Transaccion', 'ID_Reporte', 'Fecha', 'Tipo', 'Categoria', 'Monto', 'Descripcion']];
                     else if (sheetName === 'Insumos') headers = [['ID_Movimiento', 'ID_Reporte', 'Fecha', 'Insumo', 'Accion', 'Cantidad', 'Unidad', 'Costo_Total', 'Categoria', 'Tamaño']];
-                    else if (sheetName === 'Camas') headers = [['ID_Cama', 'Nombre', 'Tipo_Tamano', 'Estado', 'Grupo']];
-                    else if (sheetName === 'Registro_Alimentacion') headers = [['ID_Alimentacion', 'ID_Cama', 'Fecha_Hora', 'Orden', 'Insumo', 'Cantidad', 'Usuario', 'Observaciones']];
+                    else if (sheetName === 'Camas') headers = [['ID_Bandeja', 'Estado', 'Grupo_Actual', 'Ciclo_Activo_ID']];
+                    else if (sheetName === 'Registro_Alimentacion') headers = [['ID_Alimentacion', 'ID_Cama', 'Fecha_Hora', 'Orden', 'Insumo', 'Cantidad', 'Usuario', 'Observaciones', 'Ciclo_ID']];
                     else if (sheetName === 'Registro_Etapas') headers = [['ID_Cambio', 'ID_Tina', 'Fecha_Hora', 'Etapa_Anterior', 'Etapa_Nueva', 'Observacion', 'Usuario']];
                     else if (sheetName === 'Registro_Eliminados') headers = [['ID_Eliminacion', 'Tipo_Registro', 'ID_Original', 'Fecha_Hora_Original', 'Contenido_Original', 'Fecha_Hora_Eliminacion', 'Usuario', 'Motivo']];
                     else if (sheetName === 'Maquinaria') headers = [['ID_Equipo', 'Nombre', 'Fecha_Adquisicion', 'Costo', 'Estado', 'Descripcion', 'Cantidad', 'Tamaño']];
+                    else if (sheetName === 'Historico_Ciclos') headers = [['Ciclo_ID', 'Grupo', 'Bandejas_IDs', 'Fecha_Inicio', 'Fecha_Cierre', 'Alimento_Consumido_Kg', 'Biomasa_Cosechada_Kg', 'Usuario']];
 
                     await gapi.client.sheets.spreadsheets.values.update({
                         spreadsheetId: this.config.spreadsheetId,
@@ -317,12 +318,14 @@ const GoogleAPI = {
 
             // Ensure existing sheets also get updated headers if they don't have the new columns yet
             const sheetsToCheck = [
-                { name: 'Camas', expected: ['ID_Cama', 'Nombre', 'Tipo_Tamano', 'Estado', 'Grupo'] },
-                { name: 'Registro_Alimentacion', expected: ['ID_Alimentacion', 'ID_Cama', 'Fecha_Hora', 'Orden', 'Insumo', 'Cantidad', 'Usuario', 'Observaciones'] },
+                { name: 'Camas', expected: ['ID_Bandeja', 'Estado', 'Grupo_Actual', 'Ciclo_Activo_ID'] },
+                { name: 'Registro_Alimentacion', expected: ['ID_Alimentacion', 'ID_Cama', 'Fecha_Hora', 'Orden', 'Insumo', 'Cantidad', 'Usuario', 'Observaciones', 'Ciclo_ID'] },
+                { name: 'Reportes', expected: ['ID_Reporte', 'Fecha_Hora', 'Descripcion', 'Fotos_IDs', 'Categoria', 'Usuario', 'Ciclo_ID'] },
                 { name: 'Registro_Etapas', expected: ['ID_Cambio', 'ID_Tina', 'Fecha_Hora', 'Etapa_Anterior', 'Etapa_Nueva', 'Observacion', 'Usuario'] },
                 { name: 'Registro_Eliminados', expected: ['ID_Eliminacion', 'Tipo_Registro', 'ID_Original', 'Fecha_Hora_Original', 'Contenido_Original', 'Fecha_Hora_Eliminacion', 'Usuario', 'Motivo'] },
                 { name: 'Insumos', expected: ['ID_Movimiento', 'ID_Reporte', 'Fecha', 'Insumo', 'Accion', 'Cantidad', 'Unidad', 'Costo_Total', 'Categoria', 'Tamaño'] },
-                { name: 'Maquinaria', expected: ['ID_Equipo', 'Nombre', 'Fecha_Adquisicion', 'Costo', 'Estado', 'Descripcion', 'Cantidad', 'Tamaño'] }
+                { name: 'Maquinaria', expected: ['ID_Equipo', 'Nombre', 'Fecha_Adquisicion', 'Costo', 'Estado', 'Descripcion', 'Cantidad', 'Tamaño'] },
+                { name: 'Historico_Ciclos', expected: ['Ciclo_ID', 'Grupo', 'Bandejas_IDs', 'Fecha_Inicio', 'Fecha_Cierre', 'Alimento_Consumido_Kg', 'Biomasa_Cosechada_Kg', 'Usuario'] }
             ];
 
             for (const item of sheetsToCheck) {
@@ -332,8 +335,10 @@ const GoogleAPI = {
                         range: `${item.name}!A1:J1`
                     });
                     const currentHeaders = res.result.values ? res.result.values[0] : [];
-                    
-                    if (currentHeaders.length < item.expected.length) {
+                    const needsUpdate = currentHeaders.length < item.expected.length || 
+                                        currentHeaders.length === 0 || 
+                                        currentHeaders[0] !== item.expected[0];
+                    if (needsUpdate) {
                         await gapi.client.sheets.spreadsheets.values.update({
                             spreadsheetId: this.config.spreadsheetId,
                             range: `${item.name}!A1`,
@@ -699,14 +704,14 @@ const GoogleAPI = {
      * Get all Camas (Breeding Units)
      */
     async getCamas() {
-        return await this.getSheetData('Camas!A:E');
+        return await this.getSheetData('Camas!A:D');
     },
 
     /**
      * Get all feeding records
      */
     async getFeedingLogs() {
-        return await this.getSheetData('Registro_Alimentacion!A:H');
+        return await this.getSheetData('Registro_Alimentacion!A:I');
     },
 
     /**
@@ -749,7 +754,7 @@ const GoogleAPI = {
      * Append multiple feeding logs in batch
      */
     async appendFeedingLogsBatch(values) {
-        return await this.appendSheetData('Registro_Alimentacion!A:H', values);
+        return await this.appendSheetData('Registro_Alimentacion!A:I', values);
     },
 
     /**
@@ -857,18 +862,106 @@ const GoogleAPI = {
      */
     async resetDatabase() {
         const sheetsToClear = [
-            'Camas!A2:E10000',
-            'Registro_Alimentacion!A2:H10000',
+            'Camas!A2:D10000',
+            'Registro_Alimentacion!A2:I10000',
             'Registro_Etapas!A2:G10000',
-            'Reportes!A2:F10000',
+            'Reportes!A2:G10000',
             'Finanzas!A2:G10000',
-            'Insumos!A2:H10000',
+            'Insumos!A2:J10000',
             'Registro_Eliminados!A2:H10000',
-            'Maquinaria!A2:F10000'
+            'Maquinaria!A2:H10000',
+            'Historico_Ciclos!A2:H10000'
         ];
         
         const promises = sheetsToClear.map(range => this.clearSheetRange(range));
         await Promise.all(promises);
+    },
+
+    /**
+     * Gestor de Activos (Alta/Baja de bandejas)
+     */
+    async manageAsset(assetIds, operation) {
+        if (!this.config.appsScriptUrl) {
+            throw new Error("La URL de Google Apps Script no está configurada. Se requiere el backend para gestionar activos.");
+        }
+        const response = await fetch(this.config.appsScriptUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'manage_asset',
+                token: this.idToken,
+                spreadsheetId: this.config.spreadsheetId,
+                assetIds: assetIds,
+                operation: operation
+            })
+        });
+        if (!response.ok) {
+            throw new Error(`Error en el servidor: ${response.statusText}`);
+        }
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.error || "Error al gestionar activos");
+        }
+        return result;
+    },
+
+    /**
+     * Iniciar un lote productivo
+     */
+    async startBatch(assetIds, grupo) {
+        if (!this.config.appsScriptUrl) {
+            throw new Error("La URL de Google Apps Script no está configurada. Se requiere el backend para iniciar lotes.");
+        }
+        const response = await fetch(this.config.appsScriptUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'start_batch',
+                token: this.idToken,
+                spreadsheetId: this.config.spreadsheetId,
+                assetIds: assetIds,
+                grupo: grupo
+            })
+        });
+        if (!response.ok) {
+            throw new Error(`Error en el servidor: ${response.statusText}`);
+        }
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.error || "Error al iniciar lote");
+        }
+        return result;
+    },
+
+    /**
+     * Cerrar / Cosechar un lote
+     */
+    async closeBatch(cicloId, biomasaCosechada) {
+        if (!this.config.appsScriptUrl) {
+            throw new Error("La URL de Google Apps Script no está configurada. Se requiere el backend para cerrar lotes.");
+        }
+        const response = await fetch(this.config.appsScriptUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'close_batch',
+                token: this.idToken,
+                spreadsheetId: this.config.spreadsheetId,
+                cicloId: cicloId,
+                biomasaCosechada: biomasaCosechada
+            })
+        });
+        if (!response.ok) {
+            throw new Error(`Error en el servidor: ${response.statusText}`);
+        }
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.error || "Error al cerrar lote");
+        }
+        return result;
     },
 
     /**
