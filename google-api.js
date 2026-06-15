@@ -85,6 +85,31 @@ const GoogleAPI = {
     },
 
     startGoogleAPI(onStatusChange, onError) {
+        // Initialize Google Identity Services (GSI) Credential Client (JWT / ID Token)
+        try {
+            google.accounts.id.initialize({
+                client_id: this.config.clientId,
+                callback: async (response) => {
+                    if (response && response.credential) {
+                        this.idToken = response.credential;
+                        localStorage.setItem('bsf_id_token', this.idToken);
+                        
+                        const payload = this.decodeJwtLocally(this.idToken);
+                        if (payload) {
+                            this.user.email = payload.email;
+                            this.user.name = payload.name;
+                            this.user.picture = payload.picture || '';
+                        }
+                        
+                        onStatusChange('logging-in');
+                        await this.initializeDatabase(onStatusChange, onError);
+                    }
+                }
+            });
+        } catch (err) {
+            console.error("GSI Credential Client init error", err);
+        }
+
         // Load GAPI
         try {
             gapi.load('client', async () => {
@@ -108,9 +133,8 @@ const GoogleAPI = {
             onError("Fallo al llamar gapi.load. Verifica si tu navegador bloquea scripts externos.");
         }
 
-        // Initialize Google Identity Services (GSI)
+        // Initialize Google Identity Services (GSI) Token Client (Access Token for GAPI)
         try {
-            // We set up tokenClient for implicit OAuth 2.0 flow
             this.tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: this.config.clientId,
                 scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
@@ -118,7 +142,6 @@ const GoogleAPI = {
                     if (tokenResponse && tokenResponse.access_token) {
                         this.accessToken = tokenResponse.access_token;
                         
-                        // Save token session for token expiration
                         localStorage.setItem('bsf_access_token', this.accessToken);
                         localStorage.setItem('bsf_token_expiry', Date.now() + (tokenResponse.expires_in * 1000));
                         
@@ -130,12 +153,39 @@ const GoogleAPI = {
             this.gsiInitialized = true;
             this.checkAllInitialized(onStatusChange, onError);
         } catch (err) {
-            console.error("GSI init error", err);
+            console.error("GSI Token Client init error", err);
             onError("Error al inicializar el cliente de autenticación de Google (gsi). Verifica el Client ID.");
         }
     },
 
     checkAllInitialized(onStatusChange, onError) {
+        if (this.config && this.config.appsScriptUrl) {
+            const savedIdToken = localStorage.getItem('bsf_id_token');
+            if (savedIdToken) {
+                const payload = this.decodeJwtLocally(savedIdToken);
+                const nowSecs = Date.now() / 1000;
+                if (payload && payload.exp && nowSecs < payload.exp) {
+                    this.idToken = savedIdToken;
+                    this.user.email = payload.email;
+                    this.user.name = payload.name;
+                    this.user.picture = payload.picture || '';
+                    
+                    onStatusChange('logging-in');
+                    this.initializeDatabase(onStatusChange, onError);
+                    
+                    // Render Google Sign-in button over login placeholder if visible
+                    const btn = document.getElementById("btn-login");
+                    if (btn) {
+                        google.accounts.id.renderButton(
+                            btn,
+                            { theme: "filled_blue", size: "large", width: 280 }
+                        );
+                    }
+                    return;
+                }
+            }
+        }
+
         if (this.gapiInitialized && this.gsiInitialized) {
             // Check if we have an active, valid token in localStorage
             const savedToken = localStorage.getItem('bsf_access_token');
@@ -156,6 +206,11 @@ const GoogleAPI = {
      * Request Access Token (Login)
      */
     login() {
+        if (this.config && this.config.appsScriptUrl) {
+            // Under Apps Script Web App mode, the Google renderButton handles popup automatically
+            google.accounts.id.prompt();
+            return;
+        }
         if (!this.tokenClient) {
             alert("El cliente de autenticación no está listo.");
             return;
@@ -172,9 +227,11 @@ const GoogleAPI = {
             google.accounts.oauth2.revokeToken(this.accessToken, () => {});
         }
         this.accessToken = null;
+        this.idToken = null;
         this.user = { email: '', name: '', picture: '', role: 'Observador' };
         localStorage.removeItem('bsf_access_token');
         localStorage.removeItem('bsf_token_expiry');
+        localStorage.removeItem('bsf_id_token');
         if (onLogoutCallback) onLogoutCallback();
     },
 
@@ -322,9 +379,8 @@ const GoogleAPI = {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         action: 'determineUserRole',
-                        spreadsheetId: this.config.spreadsheetId,
-                        email: this.user.email,
-                        name: this.user.name
+                        token: this.idToken,
+                        spreadsheetId: this.config.spreadsheetId
                     })
                 });
                 if (!response.ok) {
@@ -425,6 +481,7 @@ const GoogleAPI = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'uploadImage',
+                    token: this.idToken,
                     base64Data: base64Data,
                     fileName: `${Date.now()}_${file.name}`,
                     mimeType: file.type,
@@ -514,7 +571,7 @@ const GoogleAPI = {
      */
     async getSheetData(range) {
         if (this.config.appsScriptUrl) {
-            const url = `${this.config.appsScriptUrl}?action=read&spreadsheetId=${encodeURIComponent(this.config.spreadsheetId)}&range=${encodeURIComponent(range)}`;
+            const url = `${this.config.appsScriptUrl}?action=read&token=${encodeURIComponent(this.idToken)}&spreadsheetId=${encodeURIComponent(this.config.spreadsheetId)}&range=${encodeURIComponent(range)}`;
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`Error al leer datos por Apps Script: ${response.statusText}`);
@@ -544,6 +601,7 @@ const GoogleAPI = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'append',
+                    token: this.idToken,
                     spreadsheetId: this.config.spreadsheetId,
                     range: range,
                     values: values
@@ -579,6 +637,7 @@ const GoogleAPI = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'update',
+                    token: this.idToken,
                     spreadsheetId: this.config.spreadsheetId,
                     range: range,
                     values: values
@@ -614,6 +673,7 @@ const GoogleAPI = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'clear',
+                    token: this.idToken,
                     spreadsheetId: this.config.spreadsheetId,
                     range: range
                 })
@@ -891,16 +951,7 @@ const GoogleAPI = {
     async addMaquinaria(nombre, fecha, costo, estado, desc, cantidad, tamano) {
         const idEquipo = `EQP-${Date.now()}`;
         
-        const sysNow = new Date();
-        const sysOffset = sysNow.getTimezoneOffset();
-        const sysLocalNow = new Date(sysNow.getTime() - (sysOffset*60*1000));
-        const sysTodayStr = sysLocalNow.toISOString().substring(0, 10);
-        const sysDateTimeStr = sysLocalNow.toISOString().replace('T', ' ').substring(0, 19);
-
         let finalDesc = desc || '';
-        if (fecha !== sysTodayStr) {
-            finalDesc += ` \n[Ingreso al Sistema: ${sysDateTimeStr}]`;
-        }
 
         const row = [
             idEquipo,
@@ -919,9 +970,6 @@ const GoogleAPI = {
         const parsedCost = parseFloat(costo) || 0;
         if (parsedCost > 0) {
             let txDesc = `Compra de activo: ${nombre}`;
-            if (fecha !== sysTodayStr) {
-                txDesc += ` \n[Ingreso al Sistema: ${sysDateTimeStr}]`;
-            }
             const txRow = [
                 `TX_${Date.now()}_${Math.floor(Math.random()*1000)}`,
                 'MANUAL',
@@ -959,6 +1007,20 @@ const GoogleAPI = {
         } catch (err) {
             console.error("Failed to fetch users", err);
             return [];
+        }
+    },
+
+    decodeJwtLocally(token) {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(jsonPayload);
+        } catch (e) {
+            console.error("Error decoding JWT locally", e);
+            return null;
         }
     }
 };

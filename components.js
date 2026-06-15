@@ -1322,16 +1322,7 @@ const Components = {
                     collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
                 }
 
-                const sysNow = new Date();
-                const sysOffset = sysNow.getTimezoneOffset();
-                const sysLocalNow = new Date(sysNow.getTime() - (sysOffset*60*1000));
-                const sysTodayStr = sysLocalNow.toISOString().substring(0, 10);
-                const sysDateTimeStr = sysLocalNow.toISOString().replace('T', ' ').substring(0, 19);
-
                 let reportDesc = collabMeta + document.getElementById('report-desc').value;
-                if (reportDateVal !== sysTodayStr) {
-                    reportDesc += ` \n[Ingreso al Sistema: ${sysDateTimeStr}]`;
-                }
 
                 const photosString = photoIds.join(',');
 
@@ -1439,16 +1430,7 @@ const Components = {
                     collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
                 }
 
-                const sysNow = new Date();
-                const sysOffset = sysNow.getTimezoneOffset();
-                const sysLocalNow = new Date(sysNow.getTime() - (sysOffset*60*1000));
-                const sysTodayStr = sysLocalNow.toISOString().substring(0, 10);
-                const sysDateTimeStr = sysLocalNow.toISOString().replace('T', ' ').substring(0, 19);
-
                 let finDesc = collabMeta + document.getElementById('finance-desc').value.trim();
-                if (finDate !== sysTodayStr) {
-                    finDesc += ` \n[Ingreso al Sistema: ${sysDateTimeStr}]`;
-                }
 
                 const financeValues = [[
                     finId,
@@ -1585,16 +1567,7 @@ const Components = {
 
                 // If supply has cost, auto-generate a financial record of Gasto
                 if (supplyCost > 0) {
-                    const sysNow = new Date();
-                    const sysOffset = sysNow.getTimezoneOffset();
-                    const sysLocalNow = new Date(sysNow.getTime() - (sysOffset*60*1000));
-                    const sysTodayStr = sysLocalNow.toISOString().substring(0, 10);
-                    const sysDateTimeStr = sysLocalNow.toISOString().replace('T', ' ').substring(0, 19);
-
                     let finDesc = `${collabMeta}Compra auto-registrada de ${supplyQty} ${supplyUnit} de ${supplyName} (${supplySize})`;
-                    if (supplyDate !== sysTodayStr) {
-                        finDesc += ` \n[Ingreso al Sistema: ${sysDateTimeStr}]`;
-                    }
 
                     const finId = `FIN_${Date.now()}_SUP`;
                     const financeValues = [[
@@ -1708,16 +1681,7 @@ const Components = {
                         collabMeta = `[Colaboradores: ${selectedCollabs.join(', ')}] `;
                     }
 
-                    const sysNow = new Date();
-                    const sysOffset = sysNow.getTimezoneOffset();
-                    const sysLocalNow = new Date(sysNow.getTime() - (sysOffset*60*1000));
-                    const sysTodayStr = sysLocalNow.toISOString().substring(0, 10);
-                    const sysDateTimeStr = sysLocalNow.toISOString().replace('T', ' ').substring(0, 19);
-
                     let txDesc = `${collabMeta}Venta a ${client} (${qty} x $${price})`;
-                    if (date !== sysTodayStr) {
-                        txDesc += ` \n[Ingreso al Sistema: ${sysDateTimeStr}]`;
-                    }
 
                     const txRow = [
                         `TX_${Date.now()}_${Math.floor(Math.random()*1000)}`,
