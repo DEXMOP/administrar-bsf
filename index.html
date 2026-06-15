@@ -1,6 +1,16 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <!-- Diagnostic Script to capture console errors -->
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            alert("JS Error: " + message + "\nFile: " + (source ? source.split('/').pop() : 'unknown') + "\nLine: " + lineno + "\nCol: " + colno + (error ? "\nStack: " + error.stack : ''));
+            return false;
+        };
+        window.onunhandledrejection = function(event) {
+            alert("Unhandled Promise Rejection: " + event.reason);
+        };
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BSF BioManager - Control de Cría</title>
@@ -12,7 +22,7 @@
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Stylesheet -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=1.6">
     <!-- PWA manifest & iOS settings -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#090d16">
@@ -323,9 +333,9 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- App Logic Scripts -->
-    <script src="config.js?v=1.5"></script>
-    <script src="google-api.js?v=1.5"></script>
-    <script src="components.js?v=1.5"></script>
-    <script src="app.js?v=1.5"></script>
+    <script src="config.js?v=1.6"></script>
+    <script src="google-api.js?v=1.6"></script>
+    <script src="components.js?v=1.6"></script>
+    <script src="app.js?v=1.6"></script>
 </body>
 </html>
