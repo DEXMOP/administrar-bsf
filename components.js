@@ -646,6 +646,9 @@ const Components = {
                     ${isSocioOrAdmin ? `
                     <span class="filter-tab" data-form="section-ingresos" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-hand-holding-dollar"></i> 5. Apuntar una Venta (Ingresos)</span>
                     ` : ''}
+                    ${GoogleAPI.user.role === 'Administrador' ? `
+                    <span class="filter-tab" data-form="section-aportes" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-handshake"></i> 6. Aportes de Socios / Efectivo</span>
+                    ` : ''}
                 </div>
 
                 <!-- FORM SECTION 1: REPORT & PHOTOS -->
@@ -998,6 +1001,53 @@ const Components = {
                         </button>
                     </form>
                 </div>
+
+                <!-- FORM SECTION 6: PARTNER CONTRIBUTIONS & CASH INFLOWS (Only for Admin) -->
+                ${GoogleAPI.user.role === 'Administrador' ? `
+                <div id="form-aportes-section" class="card hidden">
+                    <h2 class="mb-3"><i class="fa-solid fa-handshake text-success"></i> 6. Aportes de Socios / Ingresos en Efectivo</h2>
+                    <p class="mb-3">Registra los aportes de capital realizados por los socios o cualquier otro ingreso de efectivo a caja que no provenga de ventas directas de producto.</p>
+                    
+                    <form id="add-capital-form">
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label class="form-label" for="capital-category">Tipo de Ingreso</label>
+                                <select id="capital-category" class="form-control" required>
+                                    <option value="Aporte de Socio">Aporte de Socio (Capitalización)</option>
+                                    <option value="Ingreso en Efectivo">Ingreso en Efectivo (Caja General)</option>
+                                    <option value="Préstamo o Financiamiento">Préstamo o Financiamiento</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="capital-amount">Monto Recibido ($)</label>
+                                <input type="number" inputmode="decimal" id="capital-amount" class="form-control" placeholder="0.00" step="0.01" min="0.01" required>
+                                ${this.renderQuickQtyButtons('capital-amount', true)}
+                            </div>
+                        </div>
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label class="form-label" for="capital-partner">Socio Aportante / Persona Origen</label>
+                                <input type="text" id="capital-partner" class="form-control" placeholder="Ej: Socio Juan Pérez, o Caja Chica" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="capital-date">Fecha del Ingreso</label>
+                                <input type="date" id="capital-date" class="form-control" value="${todayStr}" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="capital-desc">Descripción / Nota</label>
+                            <input type="text" id="capital-desc" class="form-control" placeholder="Ej: Aporte para compra de insumos de cría, o saldo inicial" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">¿Quiénes gestionaron este ingreso? (Colaboradores)</label>
+                            ${this.renderCollaboratorsList(users, 'capital')}
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block btn-lg mt-3">
+                            <i class="fa-solid fa-floppy-disk"></i> Registrar Aporte / Ingreso en Efectivo
+                        </button>
+                    </form>
+                </div>
+                ` : ''}
             </div>
         `;
 
@@ -1008,6 +1058,7 @@ const Components = {
         const secInsumos = document.getElementById('form-insumos-section');
         const secMaquinaria = document.getElementById('form-maquinaria-section');
         const secIngresos = document.getElementById('form-ingresos-section');
+        const secAportes = document.getElementById('form-aportes-section');
 
         formTabs.forEach(tab => {
             tab.addEventListener('click', () => {
@@ -1022,6 +1073,7 @@ const Components = {
                 if (secInsumos) secInsumos.classList.add('hidden');
                 if (secMaquinaria) secMaquinaria.classList.add('hidden');
                 if (secIngresos) secIngresos.classList.add('hidden');
+                if (secAportes) secAportes.classList.add('hidden');
 
                 // PARCHE: Validar existencia antes de mostrar
                 if (targetForm === 'section-bitacora' && secBitacora) {
@@ -1034,6 +1086,8 @@ const Components = {
                     secMaquinaria.classList.remove('hidden');
                 } else if (targetForm === 'section-ingresos' && secIngresos) {
                     secIngresos.classList.remove('hidden');
+                } else if (targetForm === 'section-aportes' && secAportes) {
+                    secAportes.classList.remove('hidden');
                 }
             });
         });
@@ -1770,6 +1824,58 @@ const Components = {
                 } catch (err) {
                     console.error("Sale submit error", err);
                     showToast(`Error al registrar venta: ${err.message}`, "error");
+                }
+            });
+        }
+
+        // FORM SUBMIT 6: PARTNER CONTRIBUTIONS & CASH INFLOWS (Aportes / Capital)
+        const addCapitalForm = document.getElementById('add-capital-form');
+        if (addCapitalForm) {
+            addCapitalForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (GoogleAPI.user.role !== 'Administrador') {
+                    alert("Acceso denegado: Solo el Administrador puede ingresar aportes de socios o efectivo general.");
+                    return;
+                }
+
+                try {
+                    const category = document.getElementById('capital-category').value;
+                    const amount = parseFloat(document.getElementById('capital-amount').value);
+                    const partner = document.getElementById('capital-partner').value.trim();
+                    const date = document.getElementById('capital-date').value;
+                    const descInput = document.getElementById('capital-desc').value.trim();
+                    
+                    const selectedCollabChks = container.querySelectorAll('input.capital-collab-chk:checked');
+                    const collabs = Array.from(selectedCollabChks).map(chk => chk.value);
+                    const collabsStr = collabs.length > 0 ? ` (Colaboradores: ${collabs.join(', ')})` : '';
+                    const fullDesc = `${category} - Origen: ${partner} | ${descInput}${collabsStr}`;
+
+                    const txRow = [
+                        `FIN_CAP_${Date.now()}`,
+                        'Manual',
+                        date,
+                        'Ingreso',
+                        category,
+                        amount.toString(),
+                        fullDesc
+                    ];
+
+                    const payload = { txRow };
+
+                    // Reset form and show visual cues immediately
+                    addCapitalForm.reset();
+                    document.getElementById('capital-date').value = todayStr;
+                    container.querySelectorAll('.collab-select-card[data-prefix="capital"]').forEach(c => c.classList.remove('selected'));
+
+                    // Redirect immediately
+                    window.location.hash = '#finances';
+
+                    // Dispatch background submission
+                    executeBackgroundSubmit('add-capital', payload, () => GoogleAPI.appendSheetData('Finanzas!A:G', [payload.txRow]));
+
+                } catch (err) {
+                    console.error("Capital submit error", err);
+                    showToast(`Error al registrar aporte de capital: ${err.message}`, "error");
                 }
             });
         }
@@ -4074,6 +4180,9 @@ const SyncQueue = {
             await submitMachineryData(task.payload);
         }
         else if (task.type === 'add-sale') {
+            await GoogleAPI.appendSheetData('Finanzas!A:G', [task.payload.txRow]);
+        }
+        else if (task.type === 'add-capital') {
             await GoogleAPI.appendSheetData('Finanzas!A:G', [task.payload.txRow]);
         }
     }
