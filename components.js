@@ -1221,8 +1221,6 @@ const Components = {
                 feedUnit: document.getElementById('report-feed-unit')?.value || ''
             };
             localStorage.setItem('bsf_report_draft', JSON.stringify(draft));
-        };
-
         const form = document.getElementById('add-report-form');
         if (form) {
             form.querySelectorAll('input, textarea, select').forEach(input => {
@@ -1232,7 +1230,7 @@ const Components = {
             restoreReportDraft();
         }
 
-        // FORM SUBMIT 1: BITÁCORA / REPORT & PHOTOS
+        // FORM SUBMIT 1: DAILY REPORT & FEEDING (Bitácora)
         document.getElementById('add-report-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             if (GoogleAPI.user.role === 'Observador') {
@@ -1264,52 +1262,54 @@ const Components = {
                     return;
                 }
 
-                // Stock validation check for Alimentación
-                showLoading("Verificando stock disponible...");
-                try {
-                    const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
-                    let currentStock = 0;
-                    let unit = '';
-                    supplyRows.slice(1).forEach(row => {
-                        const name = row[3] ? row[3].trim().toLowerCase() : '';
-                        if (name === insumo.toLowerCase()) {
-                            const act = row[4];
-                            const qty = parseFloat(row[5]) || 0;
-                            unit = row[6] || 'kg';
-                            if (act === 'Adición') currentStock += qty;
-                            else if (act === 'Utilización') currentStock -= qty;
-                        }
-                    });
+                // Hot stock validation (only when online)
+                if (navigator.onLine) {
+                    try {
+                        const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
+                        let currentStock = 0;
+                        let unit = '';
+                        supplyRows.slice(1).forEach(row => {
+                            const name = row[3] ? row[3].trim().toLowerCase() : '';
+                            if (name === insumo.toLowerCase()) {
+                                const act = row[4];
+                                const qty = parseFloat(row[5]) || 0;
+                                unit = row[6] || 'kg';
+                                if (act === 'Adición') currentStock += qty;
+                                else if (act === 'Utilización') currentStock -= qty;
+                            }
+                        });
 
-                    if (totalQty > currentStock) {
-                        hideLoading();
-                        alert(`Error: No hay suficiente stock en bodega para alimentar.\nStock actual de "${insumo}": ${currentStock.toFixed(2)} ${unit}.\nCantidad solicitada: ${totalQty.toFixed(2)} ${unit}.`);
-                        return;
+                        if (totalQty > currentStock) {
+                            alert(`Error: No hay suficiente stock en bodega para alimentar.\nStock actual de "${insumo}": ${currentStock.toFixed(2)} ${unit}.\nCantidad solicitada: ${totalQty.toFixed(2)} ${unit}.`);
+                            return;
+                        }
+                    } catch (stockErr) {
+                        console.warn("Fallo al verificar stock en caliente", stockErr);
                     }
-                } catch (stockErr) {
-                    console.warn("Fallo al verificar stock", stockErr);
                 }
             }
 
-            showLoading("Subiendo fotos y registrando bitácora...");
+            // Show a Toast immediately and begin background operation
+            showToast("Procesando fotos y registrando bitácora...", "info");
 
             try {
-                // 1. Compress and Upload files to Google Drive
-                const photoIds = [];
+                // Compress and encode selected images locally
+                const localImages = [];
                 for (const file of this.selectedFiles) {
                     let fileToUpload = file;
                     try {
-                        showLoading(`Optimizando foto: ${file.name}...`);
                         fileToUpload = await this.compressImage(file);
                     } catch (compressErr) {
                         console.warn("Fallo al comprimir, subiendo original", compressErr);
                     }
-                    showLoading(`Subiendo foto: ${file.name}...`);
-                    const driveId = await GoogleAPI.uploadImageToDrive(fileToUpload);
-                    photoIds.push(driveId);
+                    const base64 = await GoogleAPI.fileToBase64(fileToUpload);
+                    localImages.push({
+                        base64,
+                        name: file.name,
+                        type: file.type
+                    });
                 }
 
-                // 2. Prepare Report Row
                 const reportId = `REP_${Date.now()}`;
                 const reportDateVal = document.getElementById('report-date').value;
                 const nowTime = new Date().toTimeString().split(' ')[0]; // HH:MM:SS
@@ -1324,67 +1324,35 @@ const Components = {
 
                 let reportDesc = collabMeta + document.getElementById('report-desc').value;
 
-                const photosString = photoIds.join(',');
-
+                // 2. Prepare Report Row values
                 const reportValues = [[
                     reportId,
                     formattedDate,
                     reportDesc,
-                    photosString,
+                    '', // Resolved in background when uploading base64
                     reportCat,
                     GoogleAPI.user.name
                 ]];
 
-                // If Alimentación, write feeding logs and supply consumption row
-                if (reportCat === 'Alimentación') {
-                    const feedUnit = document.getElementById('report-feed-unit').value;
-                    const qtyPerTina = totalQty / selectedTinas.length;
-
-                    // Query today's logs to calculate next feeding order
-                    const allLogs = await GoogleAPI.getFeedingLogs();
-                    const todayLogs = allLogs.slice(1).filter(log => log[2] && log[2].startsWith(reportDateVal));
-                    let nextOrder = todayLogs.length + 1;
-
-                    const feedingRows = selectedTinas.map(tinaId => {
-                        const row = [
-                            `FEED_${Date.now()}_${Math.floor(Math.random()*1000)}`,
-                            tinaId,
-                            formattedDate,
-                            nextOrder,
-                            insumo,
-                            qtyPerTina,
-                            GoogleAPI.user.name,
-                            `Alimentación registrada vía Reporte Diario ${reportId} (${feedUnit})`
-                        ];
-                        nextOrder++;
-                        return row;
-                    });
-
-                    // Append feedings
-                    await GoogleAPI.appendFeedingLogsBatch(feedingRows);
-
-                    // Add supply utilization log linked to this reportId
-                    const supplyValues = [[
-                        `SUP_${Date.now()}_FEED_REP`,
-                        reportId,
-                        reportDateVal,
+                const payload = {
+                    reportId,
+                    formattedDate,
+                    reportDateVal,
+                    reportDesc,
+                    reportCat,
+                    username: GoogleAPI.user.name,
+                    localImages,
+                    reportValues,
+                    isAlimentacion: reportCat === 'Alimentación',
+                    alimentacion: reportCat === 'Alimentación' ? {
+                        selectedTinas,
+                        feedUnit: document.getElementById('report-feed-unit').value,
                         insumo,
-                        'Utilización',
-                        totalQty,
-                        feedUnit,
-                        0,
-                        'Sustrato', // Category is Sustrato
-                        '' // Tamaño
-                    ]];
-                    await GoogleAPI.appendSheetData('Insumos!A:J', supplyValues);
-                }
+                        totalQty
+                    } : null
+                };
 
-                await GoogleAPI.appendSheetData('Reportes!A:F', reportValues);
-                
-                hideLoading();
-                alert("¡Bitácora y novedades registradas con éxito!");
-
-                // Reset
+                // Clear/Reset form immediately
                 document.getElementById('add-report-form').reset();
                 this.selectedFiles = [];
                 previewContainer.innerHTML = '';
@@ -1397,12 +1365,15 @@ const Components = {
                 container.querySelectorAll('.collab-select-card[data-prefix="report"]').forEach(c => c.classList.remove('selected'));
                 container.querySelectorAll('.tina-select-card[data-prefix="report"]').forEach(c => c.classList.remove('selected'));
                 
-                // Redirect
+                // Redirect user immediately
                 window.location.hash = '#reports-list';
+
+                // Dispatch background submission
+                executeBackgroundSubmit('add-report', payload, () => submitReportData(payload));
+
             } catch (err) {
                 console.error("Report submit error", err);
-                hideLoading();
-                alert(`Error al registrar bitácora: ${err.message}`);
+                showToast(`Error al procesar formulario: ${err.message}`, "error");
             }
         });
 
@@ -1413,8 +1384,6 @@ const Components = {
                 alert("Acceso denegado: El rol 'Observador' no puede ingresar datos.");
                 return;
             }
-
-            showLoading("Registrando gasto...");
 
             try {
                 const finId = `FIN_${Date.now()}`;
@@ -1434,7 +1403,7 @@ const Components = {
 
                 const financeValues = [[
                     finId,
-                    'MANUAL', // Independent
+                    'MANUAL',
                     finDate,
                     finType,
                     finCat,
@@ -1442,22 +1411,22 @@ const Components = {
                     finDesc
                 ]];
 
-                await GoogleAPI.appendSheetData('Finanzas!A:G', financeValues);
+                const payload = { financeValues };
 
-                hideLoading();
-                alert("¡Gasto registrado con éxito!");
-
-                // Reset
+                // Clear/Reset immediately
                 document.getElementById('add-finance-form').reset();
                 document.getElementById('finance-date').value = todayStr;
                 container.querySelectorAll('.collab-select-card[data-prefix="finance"]').forEach(c => c.classList.remove('selected'));
                 
-                // Redirect
+                // Redirect immediately
                 window.location.hash = '#finances';
+
+                // Dispatch background submission
+                executeBackgroundSubmit('add-finance', payload, () => GoogleAPI.appendSheetData('Finanzas!A:G', financeValues));
+
             } catch (err) {
                 console.error("Finance submit error", err);
-                hideLoading();
-                alert(`Error al registrar gasto: ${err.message}`);
+                showToast(`Error al procesar gasto: ${err.message}`, "error");
             }
         });
 
@@ -1476,8 +1445,6 @@ const Components = {
                 selectedTinas = Array.from(selectedChks).map(chk => chk.value);
             }
 
-            showLoading("Registrando movimiento de bodega...");
-
             try {
                 const supId = `SUP_${Date.now()}`;
                 const supplyCategory = document.getElementById('supply-category').value;
@@ -1488,29 +1455,30 @@ const Components = {
                 const supplyCost = parseFloat(document.getElementById('supply-cost').value) || 0;
                 const supplySize = document.getElementById('supply-size').value;
 
-                // Validation to prevent negative stock on Utilización
-                if (supplyAction === 'Utilización') {
-                    showLoading("Verificando stock disponible en bodega...");
-                    const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
-                    let currentStock = 0;
-                    let unit = '';
-                    supplyRows.slice(1).forEach(row => {
-                        const name = row[3] ? row[3].trim().toLowerCase() : '';
-                        if (name === supplyName.toLowerCase()) {
-                            const act = row[4];
-                            const qty = parseFloat(row[5]) || 0;
-                            unit = row[6] || 'kg';
-                            if (act === 'Adición') currentStock += qty;
-                            else if (act === 'Utilización') currentStock -= qty;
-                        }
-                    });
+                // Validation to prevent negative stock on Utilización (only online)
+                if (supplyAction === 'Utilización' && navigator.onLine) {
+                    try {
+                        const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
+                        let currentStock = 0;
+                        let unit = '';
+                        supplyRows.slice(1).forEach(row => {
+                            const name = row[3] ? row[3].trim().toLowerCase() : '';
+                            if (name === supplyName.toLowerCase()) {
+                                const act = row[4];
+                                const qty = parseFloat(row[5]) || 0;
+                                unit = row[6] || 'kg';
+                                if (act === 'Adición') currentStock += qty;
+                                else if (act === 'Utilización') currentStock -= qty;
+                            }
+                        });
 
-                    if (supplyQty > currentStock) {
-                        hideLoading();
-                        alert(`Error: No hay suficiente stock en bodega para esta utilización.\nStock actual de "${supplyName}": ${currentStock.toFixed(2)} ${unit}.\nCantidad solicitada: ${supplyQty.toFixed(2)} ${unit}.`);
-                        return;
+                        if (supplyQty > currentStock) {
+                            alert(`Error: No hay suficiente stock en bodega para esta utilización.\nStock actual de "${supplyName}": ${currentStock.toFixed(2)} ${unit}.\nCantidad solicitada: ${supplyQty.toFixed(2)} ${unit}.`);
+                            return;
+                        }
+                    } catch (stockErr) {
+                        console.warn("Fallo al verificar stock en bodega, ignorando check offline:", stockErr);
                     }
-                    showLoading("Registrando movimiento de bodega...");
                 }
 
                 // Collaborators metadata
@@ -1534,18 +1502,25 @@ const Components = {
                 ]];
 
                 // If Action is Utilización and N > 0 tinas selected, write feeding logs
+                let feedingRows = [];
                 if (supplyAction === 'Utilización' && selectedTinas.length > 0) {
                     const qtyPerTina = supplyQty / selectedTinas.length;
 
-                    // Query today's logs for order numbering
-                    const allLogs = await GoogleAPI.getFeedingLogs();
-                    const todayLogs = allLogs.slice(1).filter(log => log[2] && log[2].startsWith(supplyDate));
-                    let nextOrder = todayLogs.length + 1;
+                    let nextOrder = 1;
+                    if (navigator.onLine) {
+                        try {
+                            const allLogs = await GoogleAPI.getFeedingLogs();
+                            const todayLogs = allLogs.slice(1).filter(log => log[2] && log[2].startsWith(supplyDate));
+                            nextOrder = todayLogs.length + 1;
+                        } catch (e) {
+                            console.warn("No se pudo consultar logs de alimentación", e);
+                        }
+                    }
 
                     const nowTime = new Date().toTimeString().split(' ')[0]; // HH:MM:SS
                     const formattedDate = `${supplyDate} ${nowTime}`;
 
-                    const feedingRows = selectedTinas.map(tinaId => {
+                    feedingRows = selectedTinas.map(tinaId => {
                         const row = [
                             `FEED_${Date.now()}_${Math.floor(Math.random()*1000)}`,
                             tinaId,
@@ -1559,18 +1534,14 @@ const Components = {
                         nextOrder++;
                         return row;
                     });
-
-                    await GoogleAPI.appendFeedingLogsBatch(feedingRows);
                 }
 
-                await GoogleAPI.appendSheetData('Insumos!A:J', supplyValues);
-
                 // If supply has cost, auto-generate a financial record of Gasto
+                let financeValues = [];
                 if (supplyCost > 0) {
                     let finDesc = `${collabMeta}Compra auto-registrada de ${supplyQty} ${supplyUnit} de ${supplyName} (${supplySize})`;
-
                     const finId = `FIN_${Date.now()}_SUP`;
-                    const financeValues = [[
+                    financeValues = [[
                         finId,
                         'MANUAL',
                         supplyDate,
@@ -1579,13 +1550,15 @@ const Components = {
                         supplyCost,
                         finDesc
                     ]];
-                    await GoogleAPI.appendSheetData('Finanzas!A:G', financeValues);
                 }
 
-                hideLoading();
-                alert("¡Movimiento de bodega registrado con éxito!");
+                const payload = {
+                    supplyValues,
+                    feedingRows,
+                    financeValues
+                };
 
-                // Reset
+                // Clear/Reset immediately
                 document.getElementById('add-supply-form').reset();
                 document.getElementById('supply-date').value = todayStr;
                 container.querySelectorAll('.collab-select-card[data-prefix="supply"]').forEach(c => c.classList.remove('selected'));
@@ -1594,12 +1567,15 @@ const Components = {
                 // Show dynamic area again since action resets to "Utilización"
                 supplyFeedingDetails.classList.remove('hidden');
 
-                // Redirect
+                // Redirect immediately
                 window.location.hash = '#supplies';
+
+                // Dispatch background submission
+                executeBackgroundSubmit('add-supply', payload, () => submitSupplyData(payload));
+
             } catch (err) {
                 console.error("Supply submit error", err);
-                hideLoading();
-                alert(`Error al registrar bodega: ${err.message}`);
+                showToast(`Error al registrar bodega: ${err.message}`, "error");
             }
         });
 
@@ -1612,8 +1588,6 @@ const Components = {
                     alert("Acceso denegado: El rol 'Observador' no puede ingresar datos.");
                     return;
                 }
-
-                showLoading("Registrando herramienta/equipo...");
 
                 try {
                     const name = document.getElementById('machinery-name').value.trim();
@@ -1632,24 +1606,40 @@ const Components = {
 
                     const desc = `${collabMeta} Cant: ${qty}, Tamaño: ${size} | ${document.getElementById('machinery-desc').value.trim()}`;
 
-                    await GoogleAPI.addMaquinaria(name, date, cost, status, desc, qty, size);
+                    const idEquipo = `EQP-${Date.now()}`;
+                    const row = [idEquipo, name, date, cost.toString(), status, desc, qty.toString(), size];
 
-                    hideLoading();
-                    alert("¡Herramienta/Equipo registrado con éxito!");
+                    let financeValues = [];
+                    if (cost > 0) {
+                        const txRow = [
+                            `TX_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+                            'MANUAL',
+                            date,
+                            'Gasto',
+                            'Activos: Compra de Maquinaria',
+                            cost.toString(),
+                            `Compra de activo: ${name}`
+                        ];
+                        financeValues = [txRow];
+                    }
 
-                    // Reset
+                    const payload = { row, financeValues };
+
+                    // Clear/Reset immediately
                     addMachineryForm.reset();
                     document.getElementById('machinery-qty').value = '1';
                     document.getElementById('machinery-date').value = todayStr;
                     container.querySelectorAll('.collab-select-card[data-prefix="machinery"]').forEach(c => c.classList.remove('selected'));
 
-                    // Redirect to supplies tab
+                    // Redirect immediately
                     window.location.hash = '#supplies';
+
+                    // Dispatch background submission
+                    executeBackgroundSubmit('add-machinery', payload, () => submitMachineryData(payload));
+
                 } catch (err) {
                     console.error("Machinery submit error", err);
-                    hideLoading();
-                    const errMsg = err.result?.error?.message || err.message || "Error desconocido";
-                    alert(`Error al registrar herramienta: ${errMsg}`);
+                    showToast(`Error al registrar herramienta: ${err.message}`, "error");
                 }
             });
         }
@@ -1663,8 +1653,6 @@ const Components = {
                     alert("Acceso denegado: El rol 'Observador' no puede ingresar datos.");
                     return;
                 }
-
-                showLoading("Registrando venta e ingreso...");
 
                 try {
                     const product = saleProduct.value;
@@ -1693,23 +1681,23 @@ const Components = {
                         txDesc
                     ];
 
-                    await GoogleAPI.appendSheetData('Finanzas!A:G', [txRow]);
+                    const payload = { txRow };
 
-                    hideLoading();
-                    alert("¡Venta e ingreso contable registrados con éxito!");
-
-                    // Reset
+                    // Reset immediately
                     addSaleForm.reset();
                     document.getElementById('sale-date').value = todayStr;
                     saleSummary.classList.add('hidden');
                     container.querySelectorAll('.collab-select-card[data-prefix="sale"]').forEach(c => c.classList.remove('selected'));
 
-                    // Redirect
+                    // Redirect immediately
                     window.location.hash = '#finances';
+
+                    // Dispatch background submission
+                    executeBackgroundSubmit('add-sale', payload, () => GoogleAPI.appendSheetData('Finanzas!A:G', [payload.txRow]));
+
                 } catch (err) {
                     console.error("Sale submit error", err);
-                    hideLoading();
-                    alert(`Error al registrar venta: ${err.message}`);
+                    showToast(`Error al registrar venta: ${err.message}`, "error");
                 }
             });
         }
@@ -4006,5 +3994,293 @@ const Components = {
         }
     }
 };
+
+// ==========================================================================
+// Toast & Offline Sync Queue Modules
+// ==========================================================================
+
+function showToast(message, type = 'info') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="toast-icon fa-solid ${type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info'}"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    container.appendChild(toast);
+    
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+const SyncQueue = {
+    getQueue() {
+        const queue = localStorage.getItem('bsf_sync_queue');
+        return queue ? JSON.parse(queue) : [];
+    },
+    saveQueue(queue) {
+        localStorage.setItem('bsf_sync_queue', JSON.stringify(queue));
+    },
+    enqueue(task) {
+        const queue = this.getQueue();
+        task.id = `TASK_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+        task.timestamp = new Date().toISOString();
+        queue.push(task);
+        this.saveQueue(queue);
+        this.updateSyncUI();
+    },
+    remove(taskId) {
+        let queue = this.getQueue();
+        queue = queue.filter(t => t.id !== taskId);
+        this.saveQueue(queue);
+        this.updateSyncUI();
+    },
+    updateSyncUI() {
+        const queue = this.getQueue();
+        const syncStatus = document.getElementById('sync-status');
+        if (syncStatus) {
+            if (queue.length > 0) {
+                syncStatus.className = 'sync-status pending';
+                syncStatus.innerHTML = `<i class="fa-solid fa-arrows-rotate fa-spin"></i> ${queue.length} pendiente(s)`;
+                syncStatus.title = `${queue.length} operaciones pendientes de sincronización. Haz clic para reintentar.`;
+                syncStatus.style.cursor = 'pointer';
+                syncStatus.onclick = (e) => {
+                    e.stopPropagation();
+                    this.processQueue();
+                };
+            } else {
+                syncStatus.className = 'sync-status online';
+                syncStatus.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Conectado';
+                syncStatus.title = 'Sincronizado con Google Sheets';
+                syncStatus.style.cursor = 'default';
+                syncStatus.onclick = null;
+            }
+        }
+    },
+    async processQueue() {
+        const queue = this.getQueue();
+        if (queue.length === 0) return;
+        
+        showToast("Iniciando sincronización pendiente...", "info");
+        let successCount = 0;
+        let failedCount = 0;
+        
+        for (const task of queue) {
+            try {
+                await this.runTask(task);
+                this.remove(task.id);
+                successCount++;
+            } catch (err) {
+                console.error("Fallo al procesar tarea de cola:", task, err);
+                failedCount++;
+                if (this.isNetworkError(err)) {
+                    showToast(`Red inestable. Quedan ${queue.length - successCount} pendientes.`, "error");
+                    break;
+                }
+            }
+        }
+        
+        if (successCount > 0) {
+            showToast(`Sincronizados ${successCount} registros exitosamente.`, "success");
+        }
+        if (failedCount > 0) {
+            showToast(`No se pudieron sincronizar ${failedCount} registros. Reintenta luego.`, "error");
+        }
+    },
+    isNetworkError(err) {
+        return !navigator.onLine || 
+               err.message.includes('NetworkError') || 
+               err.message.includes('Failed to fetch') ||
+               err.message.includes('network error') ||
+               err.message.includes('HttpError');
+    },
+    async runTask(task) {
+        if (task.type === 'add-report') {
+            await submitReportData(task.payload);
+        } 
+        else if (task.type === 'add-finance') {
+            await GoogleAPI.appendSheetData('Finanzas!A:G', task.payload.financeValues);
+        }
+        else if (task.type === 'add-supply') {
+            await submitSupplyData(task.payload);
+        }
+        else if (task.type === 'add-machinery') {
+            await submitMachineryData(task.payload);
+        }
+        else if (task.type === 'add-sale') {
+            await GoogleAPI.appendSheetData('Finanzas!A:G', [task.payload.txRow]);
+        }
+    }
+};
+
+async function executeBackgroundSubmit(type, payload, runAction) {
+    if (!navigator.onLine) {
+        showToast("Sin conexión. Guardado en la cola para sincronizar después.", "warning");
+        SyncQueue.enqueue({ type, payload });
+        return;
+    }
+    
+    showToast("Guardando en segundo plano...", "info");
+    try {
+        await runAction();
+        showToast("Registro guardado con éxito.", "success");
+    } catch (err) {
+        console.error(`Error al enviar ${type} en background:`, err);
+        showToast("Error de conexión. Se guardó en la cola para reintento.", "warning");
+        SyncQueue.enqueue({ type, payload });
+    }
+}
+
+async function submitReportData(payload) {
+    const photoIds = [];
+    if (payload.localImages && payload.localImages.length > 0) {
+        for (const img of payload.localImages) {
+            let driveId;
+            if (GoogleAPI.config.appsScriptUrl) {
+                const response = await fetch(GoogleAPI.config.appsScriptUrl, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'uploadImage',
+                        token: GoogleAPI.idToken,
+                        base64Data: img.base64,
+                        fileName: `${Date.now()}_${img.name}`,
+                        mimeType: img.type,
+                        folderId: GoogleAPI.config.driveFolderId
+                    })
+                });
+                const res = await response.json();
+                if (!res.success) throw new Error(res.error || "Fallo en subida");
+                driveId = res.fileId;
+            } else {
+                const metadata = {
+                    name: `${Date.now()}_${img.name}`,
+                    mimeType: img.type,
+                    parents: [GoogleAPI.config.driveFolderId]
+                };
+                const boundary = 'bsf_multipart_boundary';
+                const delimiter = `\r\n--${boundary}\r\n`;
+                const close_delim = `\r\n--${boundary}--`;
+                const multipartRequestBody =
+                    delimiter +
+                    'Content-Type: application/json\r\n\r\n' +
+                    JSON.stringify(metadata) +
+                    delimiter +
+                    `Content-Type: ${img.type}\r\n` +
+                    'Content-Transfer-Encoding: base64\r\n\r\n' +
+                    img.base64 +
+                    close_delim;
+                const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${GoogleAPI.accessToken}`,
+                        'Content-Type': `multipart/related; boundary=${boundary}`
+                    },
+                    body: multipartRequestBody
+                });
+                const result = await response.json();
+                try {
+                    await gapi.client.drive.permissions.create({
+                        fileId: result.id,
+                        resource: { role: 'reader', type: 'anyone' }
+                    });
+                } catch (pErr) { console.warn(pErr); }
+                driveId = result.id;
+            }
+            photoIds.push(driveId);
+        }
+    }
+    
+    const finalPhotosString = photoIds.join(',');
+    payload.reportValues[0][3] = finalPhotosString;
+    
+    if (payload.isAlimentacion && payload.alimentacion) {
+        let nextOrder = 1;
+        try {
+            const allLogs = await GoogleAPI.getFeedingLogs();
+            const todayLogs = allLogs.slice(1).filter(log => log[2] && log[2].startsWith(payload.reportDateVal));
+            nextOrder = todayLogs.length + 1;
+        } catch (e) {
+            console.warn("No se pudo consultar orden de alimentación", e);
+        }
+        
+        const qtyPerTina = payload.alimentacion.totalQty / payload.alimentacion.selectedTinas.length;
+        const feedingRows = payload.alimentacion.selectedTinas.map(tinaId => {
+            const row = [
+                `FEED_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+                tinaId,
+                payload.formattedDate,
+                nextOrder,
+                payload.alimentacion.insumo,
+                qtyPerTina,
+                payload.username,
+                `Alimentación registrada vía Reporte Diario ${payload.reportId} (${payload.alimentacion.feedUnit})`
+            ];
+            nextOrder++;
+            return row;
+        });
+        
+        const supplyValues = [[
+            `SUP_${Date.now()}_FEED_REP`,
+            payload.reportId,
+            payload.reportDateVal,
+            payload.alimentacion.insumo,
+            'Utilización',
+            payload.alimentacion.totalQty,
+            payload.alimentacion.feedUnit,
+            0,
+            'Sustrato',
+            ''
+        ]];
+        
+        await GoogleAPI.appendFeedingLogsBatch(feedingRows);
+        await GoogleAPI.appendSheetData('Insumos!A:J', supplyValues);
+    }
+    
+    await GoogleAPI.appendSheetData('Reportes!A:F', payload.reportValues);
+}
+
+async function submitSupplyData(payload) {
+    if (payload.feedingRows && payload.feedingRows.length > 0) {
+        await GoogleAPI.appendFeedingLogsBatch(payload.feedingRows);
+    }
+    await GoogleAPI.appendSheetData('Insumos!A:J', payload.supplyValues);
+    if (payload.financeValues && payload.financeValues.length > 0) {
+        await GoogleAPI.appendSheetData('Finanzas!A:G', payload.financeValues);
+    }
+}
+
+async function submitMachineryData(payload) {
+    await GoogleAPI.appendSheetData('Maquinaria!A:H', [payload.row]);
+    if (payload.financeValues && payload.financeValues.length > 0) {
+        await GoogleAPI.appendSheetData('Finanzas!A:G', payload.financeValues);
+    }
+}
+
+window.showToast = showToast;
+window.SyncQueue = SyncQueue;
+window.addEventListener('online', () => {
+    SyncQueue.processQueue();
+});
+window.addEventListener('DOMContentLoaded', () => {
+    SyncQueue.updateSyncUI();
+    if (navigator.onLine) {
+        SyncQueue.processQueue();
+    }
+});
 
 

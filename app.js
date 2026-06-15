@@ -16,6 +16,7 @@ const App = {
         this.bindEvents();
         this.initTheme();
         this.initGoogleAPI();
+        this.registerServiceWorker();
     },
 
     cacheDOM() {
@@ -86,9 +87,23 @@ const App = {
      * Set up dark/light theme on start
      */
     initTheme() {
-        const preferredTheme = localStorage.getItem('bsf_theme') || 'dark-theme';
+        let preferredTheme = localStorage.getItem('bsf_theme');
+        if (!preferredTheme) {
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            preferredTheme = prefersDark ? 'dark-theme' : 'light-theme';
+        }
         this.elements.body.className = preferredTheme;
         this.updateThemeIcon(preferredTheme);
+    },
+
+    registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(reg => console.log('Service Worker registrado con éxito:', reg.scope))
+                    .catch(err => console.error('Error al registrar Service Worker:', err));
+            });
+        }
     },
 
     toggleTheme() {
