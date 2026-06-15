@@ -459,6 +459,18 @@ img {
     font-weight: 500;
 }
 
+.user-role-badge.admin {
+    color: #e67e22 !important;
+}
+
+.user-role-badge.partner {
+    color: #3498db !important;
+}
+
+.user-role-badge.operator {
+    color: #2ecc71 !important;
+}
+
 /* Main Workspace */
 .main-content {
     flex-grow: 1;

@@ -581,6 +581,7 @@ const Components = {
 
         const container = document.getElementById(containerId);
         this.selectedFiles = []; // Reset selected files list
+        const isSocioOrAdmin = (GoogleAPI.user.role === 'Socio' || GoogleAPI.user.role === 'Administrador');
 
         // Determine today's local date for date pickers
         const now = new Date();
@@ -619,10 +620,14 @@ const Components = {
                 <!-- Navigation Sub-tabs for Independent Registries -->
                 <div class="filter-tabs mb-3" id="report-type-tabs" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     <span class="filter-tab active" data-form="section-bitacora" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-notes-medical"></i> 1. Fotos y Novedades del Criadero</span>
+                    ${isSocioOrAdmin ? `
                     <span class="filter-tab" data-form="section-finanzas" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-scale-balanced"></i> 2. Apuntar un Gasto (Compras/Pagos)</span>
+                    ` : ''}
                     <span class="filter-tab" data-form="section-insumos" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-boxes-stacked"></i> 3. Mover Bodega (Entradas/Salidas)</span>
                     <span class="filter-tab" data-form="section-maquinaria" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-screwdriver-wrench"></i> 4. Registrar Herramientas y Máquinas</span>
+                    ${isSocioOrAdmin ? `
                     <span class="filter-tab" data-form="section-ingresos" style="cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-weight: 600;"><i class="fa-solid fa-hand-holding-dollar"></i> 5. Apuntar una Venta (Ingresos)</span>
+                    ` : ''}
                 </div>
 
                 <!-- FORM SECTION 1: REPORT & PHOTOS -->
@@ -1863,7 +1868,7 @@ const Components = {
                                     </div>
                                     <div class="timeline-actions">
                                         <span class="timeline-category">${cat}</span>
-                                        ${GoogleAPI.user.role === 'Administrador' ? `
+                                        ${(GoogleAPI.user.role === 'Socio' || GoogleAPI.user.role === 'Administrador') ? `
                                             <button class="btn btn-outline btn-sm text-danger btn-delete-report" data-id="${id}" title="Eliminar reporte">
                                                 <i class="fa-solid fa-trash"></i>
                                             </button>
@@ -2648,16 +2653,16 @@ const Components = {
                         <i class="fa-solid fa-shuttle-space text-secondary" style="font-size: 3.5rem; margin-bottom: 1.5rem;"></i>
                         <h3>No hay tinas registradas en el sistema</h3>
                         <p class="mb-4">Para comenzar a registrar alimentaciones, primero debes dar de alta las tinas de tu criadero.</p>
-                        ${GoogleAPI.user.role === 'Administrador' ? `
+                        ${(GoogleAPI.user.role === 'Socio' || GoogleAPI.user.role === 'Administrador') ? `
                             <button id="btn-open-creator-first" class="btn btn-primary"><i class="fa-solid fa-wand-magic-sparkles"></i> Crear Tinas en Rango</button>
-                        ` : '<p class="text-warning">Solo el rol Administrador puede crear tinas en el sistema.</p>'}
+                        ` : '<p class="text-warning">Solo los administradores y socios pueden crear tinas en el sistema.</p>'}
                     </div>
 
                     <!-- Creation Modal Container (Placeholder) -->
                     <div id="cama-create-modal" class="modal-overlay hidden"></div>
                 `;
 
-                if (GoogleAPI.user.role === 'Administrador') {
+                if (GoogleAPI.user.role === 'Socio' || GoogleAPI.user.role === 'Administrador') {
                     document.getElementById('btn-open-creator-first').addEventListener('click', () => {
                         this.showCamaCreatorModal(containerId, showLoading, hideLoading);
                     });
@@ -2702,7 +2707,7 @@ const Components = {
                                         </select>
                                     </div>
 
-                                    ${GoogleAPI.user.role === 'Administrador' ? `
+                                    ${(GoogleAPI.user.role === 'Socio' || GoogleAPI.user.role === 'Administrador') ? `
                                         <button id="btn-open-cama-creator" class="btn btn-outline btn-sm" style="height: 38px;">
                                             <i class="fa-solid fa-plus"></i> Configurar Tinas
                                         </button>

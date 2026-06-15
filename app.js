@@ -169,6 +169,7 @@ const App = {
                 roleBadge.textContent = GoogleAPI.user.role;
                 roleBadge.className = 'user-role-badge';
                 if (GoogleAPI.user.role === 'Administrador') roleBadge.classList.add('admin');
+                else if (GoogleAPI.user.role === 'Socio') roleBadge.classList.add('partner');
                 else if (GoogleAPI.user.role === 'Operario') roleBadge.classList.add('operator');
 
                 // Sync status indicator
@@ -224,9 +225,10 @@ const App = {
      */
     enforceRoleVisibilities() {
         const role = GoogleAPI.user.role;
+        const isSocioOrAdmin = (role === 'Socio' || role === 'Administrador');
         
-        if (role === 'Operario') {
-            // Operarios should not see Finances or Panel General
+        if (!isSocioOrAdmin) {
+            // Non-partners should not see Finances or Panel General
             document.getElementById('nav-desktop-dashboard').classList.add('hidden');
             document.getElementById('nav-desktop-finances').classList.add('hidden');
             document.getElementById('nav-mobile-dashboard').classList.add('hidden');
@@ -237,7 +239,7 @@ const App = {
                 window.location.hash = '#add-report';
             }
         } else {
-            // Restore visibility for Admins/Observadores
+            // Restore visibility for Partners / Admins
             document.getElementById('nav-desktop-dashboard').classList.remove('hidden');
             document.getElementById('nav-desktop-finances').classList.remove('hidden');
             document.getElementById('nav-mobile-dashboard').classList.remove('hidden');
@@ -260,7 +262,8 @@ const App = {
 
         // Role authorization guard
         const role = GoogleAPI.user.role;
-        if (role === 'Operario' && (page === 'dashboard' || page === 'finances')) {
+        const isSocioOrAdmin = (role === 'Socio' || role === 'Administrador');
+        if (!isSocioOrAdmin && (page === 'dashboard' || page === 'finances')) {
             window.location.hash = '#add-report';
             return;
         }
