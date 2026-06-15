@@ -30,6 +30,8 @@ const App = {
             btnLogoutDesktop: document.getElementById('btn-logout-desktop'),
             btnThemeToggle: document.getElementById('btn-theme-toggle'),
             btnConfigToggle: document.getElementById('btn-config-toggle'),
+            btnLoginConfig: document.getElementById('btn-login-config'),
+            btnErrorConfig: document.getElementById('btn-error-config'),
             currentPageTitle: document.getElementById('current-page-title'),
             contentArea: document.getElementById('content-area'),
             userAvatar: document.getElementById('user-avatar'),
@@ -63,9 +65,20 @@ const App = {
         // Theme toggle
         this.elements.btnThemeToggle.addEventListener('click', () => this.toggleTheme());
 
-        // Configuration toggle
+        // Configuration toggles
         if (this.elements.btnConfigToggle) {
             this.elements.btnConfigToggle.addEventListener('click', () => {
+                this.showSetupView();
+            });
+        }
+        if (this.elements.btnLoginConfig) {
+            this.elements.btnLoginConfig.addEventListener('click', () => {
+                this.showSetupView();
+            });
+        }
+        if (this.elements.btnErrorConfig) {
+            this.elements.btnErrorConfig.addEventListener('click', () => {
+                this.elements.errorModal.classList.add('hidden');
                 this.showSetupView();
             });
         }

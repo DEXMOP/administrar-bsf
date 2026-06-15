@@ -52,8 +52,11 @@
             </div>
             <div class="login-body">
                 <p class="login-description">Inicia sesión con tu cuenta de Google autorizada para acceder al sistema y sincronizar tus datos con Google Drive y Google Sheets.</p>
-                <button id="btn-login" class="btn btn-primary btn-block btn-lg">
+                <button id="btn-login" class="btn btn-primary btn-block btn-lg" style="margin-bottom: 0.75rem;">
                     <i class="fa-brands fa-google btn-icon"></i> Iniciar Sesión con Google
+                </button>
+                <button id="btn-login-config" class="btn btn-outline btn-block">
+                    <i class="fa-solid fa-gears"></i> Configuración de Conexión
                 </button>
             </div>
             <div class="login-footer">
@@ -185,8 +188,9 @@
             <div class="modal-body">
                 <p id="error-modal-message">Ha ocurrido un error inesperado al conectar con las APIs de Google.</p>
             </div>
-            <div class="modal-footer">
-                <button id="btn-error-close" class="btn btn-secondary">Cerrar</button>
+            <div class="modal-footer" style="display: flex; gap: 0.75rem; width: 100%; box-sizing: border-box;">
+                <button id="btn-error-config" class="btn btn-outline" style="flex: 1; margin: 0; width: auto;"><i class="fa-solid fa-gears"></i> Configurar</button>
+                <button id="btn-error-close" class="btn btn-secondary" style="flex: 1; margin: 0; width: auto;">Cerrar</button>
             </div>
         </div>
     </div>
