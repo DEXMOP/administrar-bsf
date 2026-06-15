@@ -818,7 +818,7 @@ const Components = {
                 }
             });
         }
-    }
+    },
 
     /**
      * Render 2. Add Report Form (Independent Registries)
