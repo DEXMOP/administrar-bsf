@@ -1263,6 +1263,33 @@ const GoogleAPI = {
         return result;
     },
 
+    /**
+     * Sync Climatology weather data via doPost sync_weather action
+     */
+    async syncWeather() {
+        if (!this.config.appsScriptUrl) {
+            throw new Error("La URL de Google Apps Script no está configurada. Se requiere el backend para sincronizar el clima.");
+        }
+        const response = await fetch(this.config.appsScriptUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+                action: 'sync_weather',
+                token: this.idToken,
+                spreadsheetId: this.config.spreadsheetId
+            })
+        });
+        if (!response.ok) {
+            throw new Error(`Error en el servidor: ${response.statusText}`);
+        }
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.error || "Error al sincronizar el clima");
+        }
+        return result;
+    },
+
     decodeJwtLocally(token) {
         try {
             const base64Url = token.split('.')[1];

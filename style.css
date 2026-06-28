@@ -944,6 +944,17 @@ textarea.form-control {
     background-color: rgba(148, 163, 184, 0.05);
 }
 
+.table th.th-sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.table th.th-sortable:hover {
+    background-color: rgba(148, 163, 184, 0.15);
+    color: var(--text-primary);
+}
+
 .table tbody tr:hover {
     background-color: rgba(148, 163, 184, 0.02);
 }

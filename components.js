@@ -532,17 +532,46 @@ const Components = {
             console.error("Error loading clima data", err);
         }
 
-        hideLoading();
-
         // Process latest records
-        const climaRecords = clima.slice(1).filter(r => r && r[0]);
+        let climaRecords = clima.slice(1).filter(r => r && r[0]);
         // Sort ascending by Date
         climaRecords.sort((a, b) => new Date(a[1].replace(' ', 'T')) - new Date(b[1].replace(' ', 'T')));
 
+        // Latest API record (if any)
+        let latestApi = [...climaRecords].reverse().find(r => r[4] === 'API Open-Meteo');
+
+        // Check if we need to sync weather (latest record is more than 1 hour old or doesn't exist)
+        const now = new Date();
+        let needsSync = false;
+        if (!latestApi) {
+            needsSync = true;
+        } else {
+            const latestApiDate = new Date(latestApi[1].replace(' ', 'T'));
+            const diffMs = now - latestApiDate;
+            const diffHours = diffMs / (1000 * 60 * 60);
+            if (diffHours >= 1.0) {
+                needsSync = true;
+            }
+        }
+
+        if (needsSync) {
+            try {
+                showLoading("Sincronizando clima...");
+                await GoogleAPI.syncWeather();
+                // Fetch fresh clima data again
+                clima = await GoogleAPI.getClimaData();
+                climaRecords = clima.slice(1).filter(r => r && r[0]);
+                climaRecords.sort((a, b) => new Date(a[1].replace(' ', 'T')) - new Date(b[1].replace(' ', 'T')));
+                latestApi = [...climaRecords].reverse().find(r => r[4] === 'API Open-Meteo');
+            } catch (err) {
+                console.error("Error syncing weather data", err);
+            }
+        }
+
+        hideLoading();
+
         // Latest manual record (if any)
         const latestManual = [...climaRecords].reverse().find(r => r[4] === 'Manual - Planta');
-        // Latest API record (if any)
-        const latestApi = [...climaRecords].reverse().find(r => r[4] === 'API Open-Meteo');
 
         const isObservador = GoogleAPI.user.role === 'Observador';
 
@@ -621,11 +650,21 @@ const Components = {
                     `}
                 </div>
 
-                <!-- Climate Dual Chart (Section 2) -->
-                <div class="card p-4">
-                    <h3 class="mb-3"><i class="fa-solid fa-chart-line text-success"></i> Comparativa Clima Ambiental (Últimos 3-5 días)</h3>
-                    <div style="height: 320px; position: relative;">
-                        <canvas id="chart-clima-ambiental" style="width: 100%; height: 100%;"></canvas>
+                <!-- Climate Charts (Section 2) -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-top: 1.5rem;">
+                    <!-- Temperature Chart -->
+                    <div class="card p-4">
+                        <h3 class="mb-3"><i class="fa-solid fa-temperature-half text-danger"></i> Historial de Temperatura (Últimos 3-5 días)</h3>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="chart-clima-temperatura" style="width: 100%; height: 100%;"></canvas>
+                        </div>
+                    </div>
+                    <!-- Humidity Chart -->
+                    <div class="card p-4">
+                        <h3 class="mb-3"><i class="fa-solid fa-droplet text-primary"></i> Historial de Humedad (Últimos 3-5 días)</h3>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="chart-clima-humedad" style="width: 100%; height: 100%;"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -665,8 +704,10 @@ const Components = {
         }
 
         // Render Chart.js
-        const ctx = document.getElementById('chart-clima-ambiental');
-        if (ctx) {
+        const ctxTemp = document.getElementById('chart-clima-temperatura');
+        const ctxHum = document.getElementById('chart-clima-humedad');
+
+        if (ctxTemp && ctxHum) {
             // Filter last 4 days of records (from 3 to 5 days)
             const fourDaysAgo = new Date();
             fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
@@ -724,7 +765,8 @@ const Components = {
             const textColor = isDark ? '#94a3b8' : '#64748b';
             const gridColor = isDark ? '#1e293b' : '#e2e8f0';
 
-            new Chart(ctx.getContext('2d'), {
+            // 1. Temperature Chart
+            new Chart(ctxTemp.getContext('2d'), {
                 type: 'line',
                 data: {
                     labels: labels.length > 0 ? labels : ['Sin Datos'],
@@ -749,27 +791,6 @@ const Components = {
                             tension: 0.35,
                             yAxisID: 'y',
                             spanGaps: true
-                        },
-                        {
-                            label: 'Humedad Interna (Manual - Planta)',
-                            data: manualHumData,
-                            borderColor: '#1d4ed8', // Dark Blue
-                            backgroundColor: 'rgba(29, 78, 216, 0.05)',
-                            borderWidth: 2.5,
-                            tension: 0.35,
-                            yAxisID: 'y1',
-                            spanGaps: true
-                        },
-                        {
-                            label: 'Humedad Externa (API Open-Meteo)',
-                            data: apiHumData,
-                            borderColor: '#06b6d4', // Celeste / Cyan
-                            backgroundColor: 'transparent',
-                            borderWidth: 2,
-                            borderDash: [6, 4], // Dotted
-                            tension: 0.35,
-                            yAxisID: 'y1',
-                            spanGaps: true
                         }
                     ]
                 },
@@ -787,8 +808,7 @@ const Components = {
                                     const label = context.dataset.label.split(' ')[0];
                                     const isExternal = context.dataset.label.includes('Externa') || context.dataset.label.includes('API');
                                     const originLabel = isExternal ? 'API Open-Meteo (sacado de internet)' : 'Manual - Planta';
-                                    const unit = context.dataset.yAxisID === 'y' ? '°C' : '%';
-                                    return `${label}: ${value} ${unit} (${originLabel})`;
+                                    return `${label}: ${value.toFixed(1)} °C (${originLabel})`;
                                 }
                             }
                         }
@@ -809,17 +829,74 @@ const Components = {
                             },
                             grid: { color: gridColor },
                             ticks: { color: textColor }
+                        }
+                    }
+                }
+            });
+
+            // 2. Humidity Chart
+            new Chart(ctxHum.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: labels.length > 0 ? labels : ['Sin Datos'],
+                    datasets: [
+                        {
+                            label: 'Humedad Interna (Manual - Planta)',
+                            data: manualHumData,
+                            borderColor: '#1d4ed8', // Dark Blue
+                            backgroundColor: 'rgba(29, 78, 216, 0.05)',
+                            borderWidth: 2.5,
+                            tension: 0.35,
+                            yAxisID: 'y',
+                            spanGaps: true
                         },
-                        y1: {
+                        {
+                            label: 'Humedad Externa (API Open-Meteo)',
+                            data: apiHumData,
+                            borderColor: '#06b6d4', // Celeste / Cyan
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [6, 4], // Dotted
+                            tension: 0.35,
+                            yAxisID: 'y',
+                            spanGaps: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: textColor, font: { family: 'Outfit', size: 11 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.parsed.y;
+                                    const label = context.dataset.label.split(' ')[0];
+                                    const isExternal = context.dataset.label.includes('Externa') || context.dataset.label.includes('API');
+                                    const originLabel = isExternal ? 'API Open-Meteo (sacado de internet)' : 'Manual - Planta';
+                                    return `${label}: ${value.toFixed(0)} % (${originLabel})`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: gridColor },
+                            ticks: { color: textColor, font: { family: 'Inter', size: 10 } }
+                        },
+                        y: {
                             type: 'linear',
-                            position: 'right',
+                            position: 'left',
                             title: {
                                 display: true,
                                 text: 'Humedad (%)',
                                 color: textColor,
                                 font: { family: 'Outfit', weight: 'bold' }
                             },
-                            grid: { drawOnChartArea: false },
+                            grid: { color: gridColor },
                             ticks: { color: textColor },
                             min: 0,
                             max: 100
@@ -2595,25 +2672,89 @@ const Components = {
                         }
                     }
                 }
-                return fallbackDate || 'Desconocida';
+                return fallbackDate ? (fallbackDate.includes('T') ? fallbackDate.split('T')[0] : fallbackDate) : 'Desconocida';
             };
 
-            // Sorting: Newest transaction date first (row[2]), secondary sort on creation timestamp (txId)
-            finances.sort((a, b) => {
-                const dateA = new Date(a[2]);
-                const dateB = new Date(b[2]);
-                if (dateB - dateA !== 0) {
-                    return dateB - dateA;
-                }
-                const getIdTime = (txId) => {
+            const getRegTimestamp = (row) => {
+                const txId = row[0];
+                const fallbackDate = row[2];
+                if (txId) {
                     const cleanId = txId.startsWith('ELIMINADO_') ? txId.replace('ELIMINADO_', '') : txId;
                     if (cleanId.startsWith('TX_')) {
                         const parts = cleanId.split('_');
-                        if (parts[1]) return parseInt(parts[1]) || 0;
+                        if (parts[1]) {
+                            const ms = parseInt(parts[1]);
+                            if (!isNaN(ms)) return ms;
+                        }
                     }
-                    return 0;
-                };
-                return getIdTime(b[0]) - getIdTime(a[0]);
+                }
+                if (fallbackDate) {
+                    return new Date(fallbackDate).getTime() || 0;
+                }
+                return 0;
+            };
+
+            // Sorting configurations
+            const sortCol = this.financeSortCol || 'date';
+            const sortAsc = this.financeSortAsc !== undefined ? this.financeSortAsc : false;
+
+            finances.sort((a, b) => {
+                let valA, valB;
+                
+                switch (sortCol) {
+                    case 'date':
+                        valA = new Date(a[2]).getTime() || 0;
+                        valB = new Date(b[2]).getTime() || 0;
+                        break;
+                    case 'type':
+                        valA = (a[3] || '').toString().toLowerCase();
+                        valB = (b[3] || '').toString().toLowerCase();
+                        break;
+                    case 'category':
+                        valA = (a[4] || '').toString().toLowerCase();
+                        valB = (b[4] || '').toString().toLowerCase();
+                        break;
+                    case 'amount':
+                        valA = parseFloat(a[5]) || 0;
+                        valB = parseFloat(b[5]) || 0;
+                        break;
+                    case 'desc':
+                        valA = (a[6] || '').toString().toLowerCase();
+                        valB = (b[6] || '').toString().toLowerCase();
+                        break;
+                    case 'report':
+                        valA = (a[1] || '').toString().toLowerCase();
+                        valB = (b[1] || '').toString().toLowerCase();
+                        break;
+                    case 'regDate':
+                        valA = getRegTimestamp(a);
+                        valB = getRegTimestamp(b);
+                        break;
+                    default:
+                        valA = new Date(a[2]).getTime() || 0;
+                        valB = new Date(b[2]).getTime() || 0;
+                }
+
+                if (valA === valB) {
+                    const getTxTime = (row) => {
+                        const txId = row[0];
+                        const cleanId = txId.startsWith('ELIMINADO_') ? txId.replace('ELIMINADO_', '') : txId;
+                        if (cleanId.startsWith('TX_')) {
+                            const parts = cleanId.split('_');
+                            if (parts[1]) return parseInt(parts[1]) || 0;
+                        }
+                        return 0;
+                    };
+                    return sortAsc ? getTxTime(a) - getTxTime(b) : getTxTime(b) - getTxTime(a);
+                }
+
+                if (typeof valA === 'number' && typeof valB === 'number') {
+                    return sortAsc ? valA - valB : valB - valA;
+                } else {
+                    return sortAsc 
+                        ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' })
+                        : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+                }
             });
 
             // Filter display based on showDeleted toggle
@@ -2623,28 +2764,39 @@ const Components = {
                 return true;
             });
 
+            const getSortIcon = (col) => {
+                const currentCol = this.financeSortCol || 'date';
+                const isAsc = this.financeSortAsc !== undefined ? this.financeSortAsc : false;
+                if (currentCol === col) {
+                    return isAsc 
+                        ? `<i class="fa-solid fa-sort-up text-success ms-1"></i>` 
+                        : `<i class="fa-solid fa-sort-down text-success ms-1"></i>`;
+                }
+                return `<i class="fa-solid fa-sort text-secondary ms-1" style="opacity: 0.4;"></i>`;
+            };
+
             container.innerHTML = `
                 <div class="slide-in-view">
                     <!-- Balance Summary Bar -->
                     <div class="dashboard-grid">
                         <div class="card kpi-card">
                             <div>
-                                <h3>Total Ingresos</h3>
-                                <div class="kpi-value text-success">$${totalIncome.toFixed(2)}</div>
+                                  <h3>Total Ingresos</h3>
+                                  <div class="kpi-value text-success">$${totalIncome.toFixed(2)}</div>
                             </div>
                             <div class="kpi-icon"><i class="fa-solid fa-circle-arrow-up text-success"></i></div>
                         </div>
                         <div class="card kpi-card">
                             <div>
-                                <h3>Total Gastos</h3>
-                                <div class="kpi-value text-danger">$${totalExpenses.toFixed(2)}</div>
+                                  <h3>Total Gastos</h3>
+                                  <div class="kpi-value text-danger">$${totalExpenses.toFixed(2)}</div>
                             </div>
                             <div class="kpi-icon"><i class="fa-solid fa-circle-arrow-down text-danger"></i></div>
                         </div>
                         <div class="card kpi-card">
                             <div>
-                                <h3>Saldo de Caja Neto</h3>
-                                <div class="kpi-value ${balance >= 0 ? 'text-success' : 'text-danger'}">$${balance.toFixed(2)}</div>
+                                  <h3>Saldo de Caja Neto</h3>
+                                  <div class="kpi-value ${balance >= 0 ? 'text-success' : 'text-danger'}">$${balance.toFixed(2)}</div>
                             </div>
                             <div class="kpi-icon blue"><i class="fa-solid fa-wallet"></i></div>
                         </div>
@@ -2663,13 +2815,13 @@ const Components = {
                             <table class="table">
                                 <thead>
                                     <tr>
-                                        <th>Fecha Mov.</th>
-                                        <th>Tipo</th>
-                                        <th>Categoría</th>
-                                        <th>Monto ($)</th>
-                                        <th>Detalle / Descripción</th>
-                                        <th>Reporte Asoc.</th>
-                                        <th>Fecha Registro</th>
+                                        <th class="th-sortable" data-sort-col="date">Fecha Mov. ${getSortIcon('date')}</th>
+                                        <th class="th-sortable" data-sort-col="type">Tipo ${getSortIcon('type')}</th>
+                                        <th class="th-sortable" data-sort-col="category">Categoría ${getSortIcon('category')}</th>
+                                        <th class="th-sortable" data-sort-col="amount">Monto ($) ${getSortIcon('amount')}</th>
+                                        <th class="th-sortable" data-sort-col="desc">Detalle / Descripción ${getSortIcon('desc')}</th>
+                                        <th class="th-sortable" data-sort-col="report">Reporte Asoc. ${getSortIcon('report')}</th>
+                                        <th class="th-sortable" data-sort-col="regDate">Fecha Registro ${getSortIcon('regDate')}</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
@@ -2687,7 +2839,7 @@ const Components = {
                                         
                                         return `
                                             <tr ${rowStyle}>
-                                                <td><strong>${row[2]}</strong></td>
+                                                <td><strong>${row[2] ? (row[2].includes('T') ? row[2].split('T')[0] : row[2]) : ''}</strong></td>
                                                 <td>
                                                     ${isDeleted ? `
                                                         <span class="badge badge-secondary" style="text-decoration: line-through;">ELIMINADO</span>
@@ -2713,7 +2865,7 @@ const Components = {
                                                 <td>
                                                     ${(!isDeleted && (GoogleAPI.user.role === 'Socio' || GoogleAPI.user.role === 'Administrador')) ? `
                                                         <button class="btn-icon-only text-danger btn-delete-finance" data-id="${row[0]}" title="Eliminar registro">
-                                                            <i class="fa-solid fa-trash"></i>
+                                                                <i class="fa-solid fa-trash"></i>
                                                         </button>
                                                     ` : ''}
                                                 </td>
@@ -2735,6 +2887,21 @@ const Components = {
                     this.renderFinances(containerId, showLoading, hideLoading);
                 });
             }
+
+            // Wire header click event listeners for sorting
+            const sortableHeaders = container.querySelectorAll('.th-sortable');
+            sortableHeaders.forEach(th => {
+                th.addEventListener('click', () => {
+                    const col = th.getAttribute('data-sort-col');
+                    if (this.financeSortCol === col) {
+                        this.financeSortAsc = !this.financeSortAsc;
+                    } else {
+                        this.financeSortCol = col;
+                        this.financeSortAsc = false; // default to descending (newest/highest) on first click
+                    }
+                    this.renderFinances(containerId, showLoading, hideLoading);
+                });
+            });
 
             // Wire delete buttons
             const deleteButtons = container.querySelectorAll('.btn-delete-finance');

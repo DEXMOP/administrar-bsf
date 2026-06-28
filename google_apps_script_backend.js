@@ -505,6 +505,14 @@ function doPost(e) {
     }
 
     // ==========================================
+    // ACCIÓN: sync_weather (Cualquier Rol)
+    // ==========================================
+    if (action === 'sync_weather') {
+      cronFetchWeather();
+      return JSONResponse({ success: true });
+    }
+
+    // ==========================================
     // ACCIÓN: add_clima (Operario/Socio/Admin)
     // ==========================================
     if (action === 'add_clima') {
