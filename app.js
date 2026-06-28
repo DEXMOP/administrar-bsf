@@ -233,6 +233,9 @@ const App = {
 
                 // Run router
                 this.route();
+
+                // Start background sync
+                this.startBackgroundSync();
                 break;
         }
     },
@@ -388,5 +391,55 @@ const App = {
             default:
                 this.elements.contentArea.innerHTML = `<div class="card p-5 text-center"><h3>Error 404</h3><p>Página no encontrada.</p></div>`;
         }
+    },
+
+    startBackgroundSync() {
+        if (this.backgroundSyncInterval) {
+            clearInterval(this.backgroundSyncInterval);
+        }
+        this.backgroundSyncInterval = setInterval(async () => {
+            const isAuthenticated = GoogleAPI.accessToken || GoogleAPI.idToken;
+            if (!isAuthenticated) return;
+
+            console.log("Iniciando sincronización en segundo plano...");
+            try {
+                // Fetch sheets in parallel in the background to update the cache
+                await Promise.all([
+                    GoogleAPI.getSheetData('Finanzas!A:G', true),
+                    GoogleAPI.getSheetData('Insumos!A:J', true),
+                    GoogleAPI.getSheetData('Reportes!A:G', true),
+                    GoogleAPI.getSheetData('Camas!A:D', true),
+                    GoogleAPI.getSheetData('Registro_Alimentacion!A:I', true)
+                ]);
+                console.log("Sincronización en segundo plano completada con éxito.");
+
+                // Silent re-render of current view (if applicable) to update data in place
+                const hash = window.location.hash || '#dashboard';
+                const page = hash.replace('#', '');
+
+                const silentShowLoading = () => {};
+                const silentHideLoading = () => {};
+
+                switch (page) {
+                    case 'dashboard':
+                        await Components.renderDashboard('content-area', silentShowLoading, silentHideLoading);
+                        break;
+                    case 'reports-list':
+                        await Components.renderReportsList('content-area', silentShowLoading, silentHideLoading);
+                        break;
+                    case 'finances':
+                        await Components.renderFinances('content-area', silentShowLoading, silentHideLoading);
+                        break;
+                    case 'supplies':
+                        await Components.renderSupplies('content-area', silentShowLoading, silentHideLoading);
+                        break;
+                    case 'feeding':
+                        await Components.renderFeeding('content-area', silentShowLoading, silentHideLoading);
+                        break;
+                }
+            } catch (err) {
+                console.warn("Error en la sincronización en segundo plano:", err);
+            }
+        }, 120000); // Every 2 minutes
     }
 };

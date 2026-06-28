@@ -15,7 +15,7 @@ const GoogleAPI = {
     
     // Client-side cache
     clientCache: {},
-    cacheExpiryMs: 60000, // 60 seconds (1 minute)
+    cacheExpiryMs: 300000, // 5 minutes (300 seconds)
 
     getSheetNameFromRange(range) {
         if (!range) return '';
