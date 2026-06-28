@@ -224,12 +224,14 @@ const Components = {
         container.innerHTML = `<div class="text-center py-5"><div class="bio-spinner"></div><p>Cargando datos del criadero...</p></div>`;
 
         try {
-            // Fetch necessary data from Sheets
-            const financeRows = await GoogleAPI.getSheetData('Finanzas!A:G');
-            const supplyRows = await GoogleAPI.getSheetData('Insumos!A:H');
-            const reportRows = await GoogleAPI.getSheetData('Reportes!A:G');
-            const camasRows = await GoogleAPI.getSheetData('Camas!A:D');
-            const feedingRows = await GoogleAPI.getSheetData('Registro_Alimentacion!A:I');
+            // Fetch necessary data from Sheets in parallel
+            const [financeRows, supplyRows, reportRows, camasRows, feedingRows] = await Promise.all([
+                GoogleAPI.getSheetData('Finanzas!A:G'),
+                GoogleAPI.getSheetData('Insumos!A:H'),
+                GoogleAPI.getSheetData('Reportes!A:G'),
+                GoogleAPI.getSheetData('Camas!A:D'),
+                GoogleAPI.getSheetData('Registro_Alimentacion!A:I')
+            ]);
 
             // Skip headers in processing and filter out empty rows
             const finances = financeRows.slice(1).filter(row => row && row[0] && row[0].trim() !== "");
@@ -916,9 +918,12 @@ const Components = {
         let camas = [];
         let users = [];
         try {
-            const rawCamas = await GoogleAPI.getCamas();
+            const [rawCamas, rawUsers] = await Promise.all([
+                GoogleAPI.getCamas(),
+                GoogleAPI.getUsuarios()
+            ]);
             camas = rawCamas.slice(1).filter(c => c[1] === 'En Servicio');
-            users = await GoogleAPI.getUsuarios();
+            users = rawUsers;
         } catch (err) {
             console.error("Error loading data for report", err);
         }
@@ -2308,10 +2313,12 @@ const Components = {
         container.innerHTML = `<div class="text-center py-5"><div class="bio-spinner"></div><p>Cargando bitácora diaria...</p></div>`;
 
         try {
-            const reportRows = await GoogleAPI.getSheetData('Reportes!A:G');
-            const financeRows = await GoogleAPI.getSheetData('Finanzas!A:G');
-            const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
-            const feedingRows = await GoogleAPI.getSheetData('Registro_Alimentacion!A:I');
+            const [reportRows, financeRows, supplyRows, feedingRows] = await Promise.all([
+                GoogleAPI.getSheetData('Reportes!A:G'),
+                GoogleAPI.getSheetData('Finanzas!A:G'),
+                GoogleAPI.getSheetData('Insumos!A:J'),
+                GoogleAPI.getSheetData('Registro_Alimentacion!A:I')
+            ]);
 
             const reports = reportRows.slice(1).filter(row => row && row[0] && row[0].trim() !== "");
             const finances = financeRows.slice(1).filter(row => row && row[0] && row[0].trim() !== "");
@@ -2452,11 +2459,13 @@ const Components = {
                     this.showDeleteReasonModal(async (reason) => {
                         showLoading("Eliminando registro y respaldando auditoría...");
                         try {
-                            // 1. Fetch data from sheets to find original content
-                            const reportRows = await GoogleAPI.getSheetData('Reportes!A:G');
-                            const financeRows = await GoogleAPI.getSheetData('Finanzas!A:G');
-                            const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
-                            const feedingRows = await GoogleAPI.getSheetData('Registro_Alimentacion!A:I');
+                            // 1. Fetch data from sheets to find original content in parallel
+                            const [reportRows, financeRows, supplyRows, feedingRows] = await Promise.all([
+                                GoogleAPI.getSheetData('Reportes!A:G'),
+                                GoogleAPI.getSheetData('Finanzas!A:G'),
+                                GoogleAPI.getSheetData('Insumos!A:J'),
+                                GoogleAPI.getSheetData('Registro_Alimentacion!A:I')
+                            ]);
 
                             // Find report row index
                             const repIdx = reportRows.findIndex(row => row[0] === repId);
@@ -2961,8 +2970,10 @@ const Components = {
         container.innerHTML = `<div class="text-center py-5"><div class="bio-spinner"></div><p>Cargando inventario y activos...</p></div>`;
 
         try {
-            const supplyRows = await GoogleAPI.getSheetData('Insumos!A:J');
-            const machineryRows = await GoogleAPI.getMaquinaria();
+            const [supplyRows, machineryRows] = await Promise.all([
+                GoogleAPI.getSheetData('Insumos!A:J'),
+                GoogleAPI.getMaquinaria()
+            ]);
 
             const supplies = supplyRows.slice(1).filter(row => row[0]);
             const machinery = machineryRows.slice(1).filter(row => row[0]);
@@ -3363,10 +3374,12 @@ const Components = {
         container.innerHTML = `<div class="text-center py-5"><div class="bio-spinner"></div><p>Cargando control de bandejas...</p></div>`;
 
         try {
-            // 1. Fetch Camas (Tinas), Feeding Logs, and Stage Logs
-            const camasRows = await GoogleAPI.getCamas();
-            const feedingRows = await GoogleAPI.getFeedingLogs();
-            const stagesRows = await GoogleAPI.getEtapasLogs();
+            // 1. Fetch Camas (Tinas), Feeding Logs, and Stage Logs in parallel
+            const [camasRows, feedingRows, stagesRows] = await Promise.all([
+                GoogleAPI.getCamas(),
+                GoogleAPI.getFeedingLogs(),
+                GoogleAPI.getEtapasLogs()
+            ]);
 
             const camas = camasRows.slice(1).filter(row => row[0]); // Skip headers
             const logs = feedingRows.slice(1).filter(row => row[0]);
